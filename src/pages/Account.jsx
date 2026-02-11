@@ -1,33 +1,35 @@
-// Ajoute cet état en haut de ton composant Discover
-const [posts, setPosts] = useState(TRENDING_RIZZ);
-const [showAdd, setShowAdd] = useState(false);
-const [newLine, setNewLine] = useState('');
-
-// Fonction pour poster
-const handlePost = () => {
-  const newPost = {
-    id: posts.length + 1,
-    author: "You", // Plus tard, on mettra le nom de l'utilisateur connecté
-    line: newLine,
-    score: "New",
-    fires: "0"
-  };
-  setPosts([newPost, ...posts]);
-  setNewLine('');
-  setShowAdd(false);
-};
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, Star, Zap, Crown, ChevronRight } from 'lucide-react';
 
 export default function Account() {
+  // États pour la gestion du profil et des posts (déplacés ici pour être valides)
+  const [posts, setPosts] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newLine, setNewLine] = useState('');
+
+  // Fonction pour poster une nouvelle ligne
+  const handlePost = () => {
+    if (!newLine.trim()) return;
+    const newPost = {
+      id: posts.length + 1,
+      author: "You",
+      line: newLine,
+      score: "New",
+      fires: "0"
+    };
+    setPosts([newPost, ...posts]);
+    setNewLine('');
+    setShowAdd(false);
+  };
+
   const stats = [
     { label: 'Lines Generated', value: '128', icon: <Zap size={20} className="text-yellow-400" /> },
     { label: 'Success Rate', value: '92%', icon: <Star size={20} className="text-blue-400" /> },
   ];
 
   return (
-    <div className="p-6 bg-black min-h-screen pb-32">
+    <div className="p-6 bg-black min-h-screen pb-32 text-white">
       {/* Profile Header */}
       <div className="flex flex-col items-center mt-8 mb-10">
         <div className="relative">
