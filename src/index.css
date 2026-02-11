@@ -2,7 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Optionnel : Force le fond noir dès le départ */
 body {
-  background-color: black;
   margin: 0;
+  background-color: black;
+  color: white;
+  overflow-x: hidden;
 }
