@@ -1,8 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* Optionnel : Force le fond noir dès le départ */
 body {
   margin: 0;
   background-color: black;
