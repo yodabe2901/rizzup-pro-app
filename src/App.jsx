@@ -8,7 +8,7 @@ import Home from './components/Home';
 import Chat from './components/Chat';
 import Library from './components/Library';
 import Search from './components/Search';
-import Profile from './components/Profile'; // La dernière pièce du puzzle
+import Profile from './components/Profile'; 
 import InstantRizz from './components/InstantRizz';
 
 export default function App() {
@@ -57,9 +57,14 @@ export default function App() {
             <Search key="search" library={rizzLibrary} />
           )}
 
-          {/* PAGE : CHAT (L'IA avec Vision) */}
+          {/* PAGE : CHAT (Connecté au Sheets via library) */}
           {activeTab === 'chat' && (
-            <Chat key="chat" onFav={toggleFavorite} favorites={favorites} />
+            <Chat 
+              key="chat" 
+              onFav={toggleFavorite} 
+              favorites={favorites} 
+              library={rizzLibrary} 
+            />
           )}
 
           {/* PAGE : LIBRARY */}
@@ -67,14 +72,18 @@ export default function App() {
             <Library key="library" library={rizzLibrary} favorites={favorites} onFav={toggleFavorite} />
           )}
 
-          {/* PAGE : PROFILE (Nouveau) */}
+          {/* PAGE : PROFILE */}
           {activeTab === 'profile' && (
             <Profile key="profile" favorites={favorites} library={rizzLibrary} />
           )}
         </AnimatePresence>
 
-        {/* MODALE : INSTANT RIZZ (Activée par le bouton central) */}
-        <InstantRizz isOpen={isInstantOpen} onClose={() => setIsInstantOpen(false)} />
+        {/* MODALE : INSTANT RIZZ (Connecté au Sheets via library) */}
+        <InstantRizz 
+          isOpen={isInstantOpen} 
+          onClose={() => setIsInstantOpen(false)} 
+          library={rizzLibrary}
+        />
 
       </main>
 
