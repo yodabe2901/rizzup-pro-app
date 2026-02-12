@@ -5,8 +5,8 @@ import {
   LayoutDashboard, Send, Zap, Trophy, ArrowRight, Bot 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ReactMarkdown from 'react-markdown'; // Run: npm install react-markdown
 
+// NOTE: We removed react-markdown to fix the build error
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [rizzLibrary, setRizzLibrary] = useState([]);
@@ -41,7 +41,6 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      {/* Navigation */}
       <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[400px] bg-zinc-900/80 backdrop-blur-3xl border border-white/10 rounded-[35px] p-2 flex justify-between items-center z-50 shadow-2xl">
         <NavBtn active={activeTab === 'home'} onClick={() => setActiveTab('home')} icon={<LayoutDashboard size={20}/>} label="Home" />
         <NavBtn active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<MessageSquare size={20}/>} label="AI Chat" />
@@ -111,12 +110,14 @@ function RizzAIChat() {
             <div className={`max-w-[85%] p-4 rounded-[24px] text-sm shadow-2xl ${
               m.role === 'ai' 
                 ? 'bg-zinc-900 border border-white/10 rounded-bl-none text-zinc-200' 
-                : 'bg-blue-600 text-white rounded-br-none font-medium'
+                : 'bg-blue-600 text-white rounded-br-none font-medium text-left'
             }`}>
-              {/* This component handles the **bold** and line breaks */}
-              <ReactMarkdown className="whitespace-pre-wrap break-words leading-relaxed">
-                {m.text}
-              </ReactMarkdown>
+              {/* Clean text display without external library */}
+              <div className="whitespace-pre-wrap break-words leading-relaxed text-left">
+                {m.text.split('**').map((part, index) => 
+                  index % 2 === 1 ? <b key={index} className="text-blue-400 font-black">{part}</b> : part
+                )}
+              </div>
             </div>
           </motion.div>
         ))}
@@ -159,10 +160,10 @@ function HomeDashboard({ stats, setTab }) {
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-blue-700 to-indigo-900 p-8 rounded-[40px] mb-8 relative overflow-hidden shadow-2xl shadow-blue-900/20">
+      <div className="bg-gradient-to-br from-blue-700 to-indigo-900 p-8 rounded-[40px] mb-8 relative overflow-hidden shadow-2xl shadow-blue-900/20 text-left">
         <div className="absolute -top-4 -right-4 p-6 opacity-10"><Zap size={120} /></div>
-        <h3 className="text-4xl font-black italic mb-2 text-left">{stats.count}</h3>
-        <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em] text-left">Expertise Modules Loaded</p>
+        <h3 className="text-4xl font-black italic mb-2">{stats.count}</h3>
+        <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em]">Expertise Modules Loaded</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-8">
@@ -192,7 +193,7 @@ function AcademyPage({ library }) {
         {library.map((item, i) => (
           <div key={i} className="bg-zinc-900/50 border border-white/5 p-6 rounded-[30px] group">
             <span className="text-blue-600 text-[9px] font-black uppercase tracking-[0.2em] mb-2 block text-left">Technique #{i+1}</span>
-            <p className="text-lg font-bold italic text-left text-white group-hover:text-blue-400 transition-colors italic">"{Object.values(item)[0]}"</p>
+            <p className="text-lg font-bold italic text-left text-white group-hover:text-blue-400 transition-colors">"{Object.values(item)[0]}"</p>
           </div>
         ))}
       </div>
