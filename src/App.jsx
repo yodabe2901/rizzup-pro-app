@@ -19,15 +19,25 @@ export default function App() {
   const [isInstantOpen, setIsInstantOpen] = useState(false);
 
   // Initialisation des données
+ // Initialisation des données
   useEffect(() => {
     async function init() {
       try {
-        const data = await fetchRizzData();
-        setRizzLibrary(data || []);
+        // 1. On appelle vraiment le service pour récupérer les données
+        const data = await fetchRizzData(); 
+        
+        // 2. On vérifie que c'est bien un tableau avant de le stocker
+        if (data && Array.isArray(data)) {
+          setRizzLibrary(data);
+        } else {
+          setRizzLibrary([]); // Sécurité : tableau vide si format incorrect
+        }
+
         const saved = localStorage.getItem('rizz_favs');
         if (saved) setFavorites(JSON.parse(saved));
       } catch (error) {
         console.error("Initialization error:", error);
+        setRizzLibrary([]); // Sécurité : évite que library reste undefined
       }
     }
     init();
