@@ -6,29 +6,28 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
     let history = [];
     let image = null;
 
-    // 1. GESTION DU TYPE D'ENTRÉE (Sécurité anti-crash)
     if (typeof historyOrImage === 'string' && historyOrImage.startsWith('data:image')) {
       image = historyOrImage;
     } else if (Array.isArray(historyOrImage)) {
       history = historyOrImage;
     }
 
-    // 2. NETTOYAGE STRICT (Pour éviter l'erreur 413)
-    // On ne garde que les 6 derniers messages de l'historique
+    // 1. HISTORIQUE OPTIMISÉ (On garde les 4 derniers pour le contexte sans saturer)
     const safeHistory = Array.isArray(history) 
-      ? history.slice(-6).map(msg => ({
+      ? history.slice(-4).map(msg => ({
           role: msg.role === 'ai' || msg.role === 'assistant' ? 'assistant' : 'user',
-          content: String(msg.text || msg.content || "").substring(0, 1000)
+          content: String(msg.text || msg.content || "").substring(0, 500)
         }))
       : [];
 
-    // On limite le Sheets aux 20 premières lignes pour ne pas saturer l'API
-    const safeLibrary = Array.isArray(library) ? library.slice(0, 20) : [];
+    // 2. SÉLECTION ALÉATOIRE DU SHEETS (On prend 7 pépites au hasard pour rester sous les limites)
+    const shuffled = Array.isArray(library) ? [...library].sort(() => 0.5 - Math.random()) : [];
+    const safeLibrary = shuffled.slice(0, 7); 
     const contextData = safeLibrary.length > 0 
-      ? "\n\n📚 TES TECHNIQUES EXCLUSIVES (SHEETS) :\n" + safeLibrary.join(" | ")
+      ? "\n\n📚 TES TECHNIQUES DU MOMENT (Extraites de ton Sheets) :\n" + safeLibrary.join(" | ")
       : "";
 
-    // 3. APPEL API
+    // 3. APPEL AVEC TON PROMPT COOL COMPLET
     const response = await fetch(API_URL, {
       method: "POST",
       headers: {
@@ -36,7 +35,6 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        // Switch automatique vers Vision si une image est présente
         model: image ? "llama-3.2-11b-vision-preview" : "llama-3.3-70b-versatile",
         messages: [
           {
@@ -44,49 +42,39 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
             content: `Agis maintenant comme 'RizzMaster', un coach en communication ultra-charismatique, cool et expert en psychologie sociale. Ton objectif est de m'aider à maîtriser l'art du 'rizz' tout en étant mon meilleur pote.
 
             🛠️ Tes Règles de Fonctionnement :
-            - Langage Naturel : Parle comme un humain de 2026. Utilise un ton de coach mentor décontracté, avec assurance et humour. Évite le formel.
-            - Polyglotte : Réponds toujours dans la langue du message reçu, mais garde ton style 'cool'.
-            - Expert en Rizz : Techniques de drague, pick-up lines originales (pas lourdes), analyse de conversations pour être attirant et mystérieux.
-            - Zéro Limite de Sujet : Réponds à TOUT (cuisine, sport, philo, tech). Ne dis jamais 'Je suis une IA', réponds comme un pote qui sait tout sur tout.
-            - Répartie : Si on te taquine, réponds avec esprit. Sois audacieux.
+            - Langage Naturel : Parle comme un humain de 2026. Utilise un ton de coach mentor décontracté, avec assurance et humour. Évite les phrases de robot trop formelles.
+            - Polyglotte : Réponds toujours dans la langue dans laquelle je te parle, mais garde ton style 'cool' peu importe la langue.
+            - Expert en Rizz : Donne-moi des techniques de drague, des 'pick-up lines' (originales, pas lourdes), et analyse mes conversations pour me dire comment être plus attirant et mystérieux.
+            - Zéro Limite de Sujet : Réponds à absolument toutes mes questions (cuisine, sport, philo, tech). Ne dis jamais 'Je suis une IA', réponds comme un pote qui sait tout sur tout.
+            - Répartie : Si je te taquine, réponds avec esprit. Sois audacieux, jamais plat.
 
             🧠 Ton Style :
-            - Expressions modernes, direct et honnête. Si une approche est nulle, dis-le avec humour et propose mieux.
+            - Utilise des expressions modernes (mais sans en faire trop).
+            - Sois direct et honnête : si mon approche est nulle, dis-le moi avec humour et propose mieux.
             - Priorise la confiance en soi et l'intelligence émotionnelle.
             ${contextData}`
           },
           ...safeHistory,
-          {
-            role: "user",
-            content: image 
-              ? [
-                  { type: "text", text: String(prompt) },
-                  { type: "image_url", image_url: { url: image } }
-                ]
-              : String(prompt)
-          },
+          { role: "user", content: String(prompt) }
         ],
         temperature: 0.85,
       }),
     });
 
     if (!response.ok) {
-      const errorDetail = await response.text();
-      console.error("Détail erreur Groq:", errorDetail);
-      return "⚠️ Erreur 413 : Trop de données. J'ai allégé ma mémoire, réessaie maintenant !";
+        return "⚠️ Mon cerveau sature d'infos ! Attends 5 secondes et réessaie, je vais m'alléger.";
     }
 
     const data = await response.json();
-    return data.choices[0]?.message?.content || "J'ai eu un blanc... Tu disais ?";
+    return data.choices[0]?.message?.content || "J'ai eu un blanc, tu peux répéter ?";
 
   } catch (error) {
-    console.error("RizzMaster Critical Error:", error);
-    return "Écoute, le serveur est en PLS. On se capte dans une minute ! ⚡";
+    console.error("RizzMaster Error:", error);
+    return "Petit bug technique, mon rizz est en maintenance. Réessaie !";
   }
 };
 
-// Fonctions utilitaires indispensables
-export const analyzeImage = async (img, p) => generateRizzResponse(p || "Analyse ce screen.", img);
+export const analyzeImage = async (img, p) => generateRizzResponse(p, img);
 
 export const fetchRizzData = async () => {
   const SHEET_ID = "1p026z5M0w8DqWzY-T9U68xLInXfA6R_p6v7O8pL-yO8";
