@@ -1,23 +1,26 @@
 import { fetchRizzData } from './data';
 
+// IMPORTANT : On ré-exporte fetchRizzData pour que App.jsx puisse l'utiliser
+export { fetchRizzData };
+
 export const generateRizzResponse = async (userMessage) => {
   const myRizzLines = await fetchRizzData();
   
-  // On transforme tes lignes Sheets en un texte pour l'IA
-  const context = myRizzLines.map(line => `Example: ${line.RizzLine}`).join("\n");
-
-  // Simulation de l'appel OpenAI avec ton contexte personnalisé
-  console.log("L'IA s'inspire de :", context);
+  // On sélectionne une ligne au hasard dans ton Sheets
+  const randomLine = myRizzLines[Math.floor(Math.random() * myRizzLines.length)];
 
   return new Promise((resolve) => {
     setTimeout(() => {
-      resolve(`Based on my elite database, you should say: "${myRizzLines[0]?.RizzLine || 'Be yourself, but better.'}"`);
+      if (randomLine && randomLine.RizzLine) {
+        resolve(`D'après mon analyse Sheets, tu devrais dire : "${randomLine.RizzLine}"`);
+      } else {
+        resolve("Mon cerveau Sheets est vide... Ajoute des lignes dans ton tableau !");
+      }
     }, 1000);
   });
 };
+
 export const validateRizz = async (text) => {
-  // Simulation de validation IA
-  // Dans une vraie app, on demande à GPT: "Est-ce que cette phrase est une pick-up line ?"
-  if (text.length < 10) return false; // Trop court = pas de Rizz
-  return true; 
+  // Simple validation : plus de 5 caractères = Rizz valide
+  return text && text.length >= 5;
 };
