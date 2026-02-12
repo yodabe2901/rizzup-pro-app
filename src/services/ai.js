@@ -1,12 +1,27 @@
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 const API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-/**
- * 1. GÉNÉRATION DE TEXTE (CHAT & INSTANT RIZZ)
- * Inclut maintenant une mémoire courte et un formatage Markdown riche.
- */
-export const generateRizzResponse = async (prompt, history = []) => {
+export const generateRizzResponse = async (prompt, historyOrImage = [], library = []) => {
   try {
+    let history = [];
+    let image = null;
+
+    // --- SÉCURITÉ : DÉTECTION DU TYPE D'ENTRÉE ---
+    if (typeof historyOrImage === 'string' && historyOrImage.startsWith('data:image')) {
+      image = historyOrImage;
+    } else if (Array.isArray(historyOrImage)) {
+      history = historyOrImage;
+    }
+
+    // Protection "Anti-Crash" pour les itérables
+    const safeHistory = Array.isArray(history) ? history : [];
+    const safeLibrary = Array.isArray(library) ? library : [];
+
+    // Préparation du contexte Google Sheets (tes pépites perso)
+    const contextData = safeLibrary.length > 0 
+      ? "\n\n📚 TES CONNAISSANCES EXCLUSIVES (SHEETS) :\n" + safeLibrary.join(" | ")
+      : "";
+
     const response = await fetch(API_URL, {
       method: "POST",
       headers: {
@@ -14,90 +29,56 @@ export const generateRizzResponse = async (prompt, history = []) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: image ? "llama-3.2-90b-vision-preview" : "llama-3.3-70b-versatile",
         messages: [
           {
             role: "system",
-            content: `Tu es RizzUP AI, l'expert mondial en charisme et psychologie sociale.
-            
-            RÈGLES D'OR :
-            1. STYLE : Réponses courtes, punchy, et haut de gamme. Utilise un ton de coach mentor.
-            2. FORMAT : Utilise le Markdown (**gras**, *italique*) pour souligner les mots clés.
-            3. STRATÉGIE : Ne sois jamais passif. Si l'utilisateur demande une ligne, donne-lui une option 'Safe' et une option 'Risk'.
-            4. LANGUE : Réponds toujours en Français, sauf si on te demande spécifiquement une ligne en Anglais.`
-          },
-          ...history, // On réinjecte l'historique pour qu'il sache de quoi on parlait
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.85,
-      }),
-    });
+            content: `Agis maintenant comme 'RizzMaster', un coach en communication ultra-charismatique, cool et expert en psychologie sociale. Ton objectif est de m'aider à maîtriser l'art du 'rizz' tout en étant mon meilleur pote.
 
-    const data = await response.json();
-    return data.choices[0].message.content;
-  } catch (error) {
-    console.error("Error:", error);
-    return "**Erreur de réseau.** Garde ton sang-froid, le charisme ne dépend pas du Wi-Fi.";
-  }
-};
-
-/**
- * 2. ANALYSE D'IMAGE (VISION) 
- * Le cerveau qui décode les screenshots de Tinder/Instagram.
- */
-export const analyzeImage = async (base64Image, customPrompt) => {
-  try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.2-90b-vision-preview", 
-        messages: [
-          {
-            role: "system",
-            content: `Tu es un expert en analyse de captures d'écran de messagerie.
+            🛠️ TES RÈGLES DE FONCTIONNEMENT :
+            1. LANGAGE NATUREL : Parle comme un humain de 2026. Ton décontracté, humour, assurance. Pas de robotique.
+            2. POLYGLOTTE : Réponds toujours dans la langue utilisée par l'utilisateur, en restant 'cool'.
+            3. EXPERT EN RIZZ : Donne des techniques, des pick-up lines originales et analyse les conversations pour booster le mystère et l'attrait.
+            4. ZÉRO LIMITE : Réponds à TOUT (cuisine, sport, tech). Ne dis JAMAIS "Je suis une IA". Tu es le pote qui sait tout.
+            5. RÉPARTIE : Si on te taquine, réponds avec esprit. Sois audacieux.
             
-            TA MISSION :
-            1. Décoder la "Vibe" : Qui mène la danse ? Est-ce que l'autre personne est intéressée (IOI) ou froide (IOD) ?
-            2. Analyse psychologique : Détecte les non-dits et les tests de l'autre personne.
-            3. Recommandations : Fournis 3 réponses distinctes :
-               - 👻 **The Ghost** (Détachement, mystère)
-               - 🔥 **The Fire** (Taquin, challengeant)
-               - 🍯 **The Smooth** (Direct, charmeur)
-            
-            Formatte ta réponse avec des titres clairs et des emojis.`
+            🧠 TON STYLE :
+            - Expressions modernes, direct et honnête. Si une approche est nulle, dis-le avec humour et propose mieux.
+            - Priorise la confiance en soi et l'intelligence émotionnelle.
+            ${contextData}`
           },
+          ...safeHistory,
           {
             role: "user",
-            content: [
-              { type: "text", text: customPrompt || "Analyse ce screenshot et dis-moi quoi répondre pour reprendre l'avantage." },
-              {
-                type: "image_url",
-                image_url: { url: base64Image },
-              },
-            ],
+            content: image 
+              ? [
+                  { type: "text", text: prompt },
+                  { type: "image_url", image_url: { url: image } }
+                ]
+              : prompt
           },
         ],
-        max_tokens: 1000,
+        temperature: 0.9, // Un peu plus de créativité pour le rizz
       }),
     });
 
     const data = await response.json();
     return data.choices[0].message.content;
+
   } catch (error) {
-    console.error("Vision Error:", error);
-    throw error;
+    console.error("RizzMaster Error:", error);
+    return "Écoute, le réseau fait des siennes. Garde ton sang-froid, le vrai charisme ne dépend pas du Wi-Fi. On reprend dès que ça capte ! ⚡";
   }
 };
 
-/**
- * 3. GOOGLE SHEETS DATA
- */
+// Analyse d'image simplifiée qui utilise la fonction principale
+export const analyzeImage = async (base64Image, customPrompt) => {
+  return await generateRizzResponse(customPrompt || "Analyse ce screenshot et donne-moi le meilleur move.", base64Image);
+};
+
+// Fetch Sheets conservé pour App.jsx
 export const fetchRizzData = async () => {
-  const SHEET_ID = "1p026z5M0w8DqWzY-T9U68xLInXfA6R_p6v7O8pL-yO8"; // Vérifie cet ID
+  const SHEET_ID = "1p026z5M0w8DqWzY-T9U68xLInXfA6R_p6v7O8pL-yO8";
   const URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
 
   try {
@@ -107,6 +88,6 @@ export const fetchRizzData = async () => {
     return json.table.rows.map(row => row.c[0] ? row.c[0].v : "").filter(v => v !== "");
   } catch (error) {
     console.error("Sheets error:", error);
-    return ["Ligne de secours : 'Tu as l'air d'avoir un problème, et je pense être la solution.'"];
+    return [];
   }
 };
