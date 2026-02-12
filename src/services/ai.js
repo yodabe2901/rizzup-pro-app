@@ -1,18 +1,20 @@
 import { fetchRizzData } from './data';
 
-const GROQ_API_KEY = "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"; // <--- COLLE TA CLÉ ICI
+const GROQ_API_KEY = "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"; 
 
 export { fetchRizzData };
 
 export const generateRizzResponse = async (userMessage) => {
-  const myRizzLines = await fetchRizzData();
-  
-  // On transforme ton Sheets en texte pour l'IA
-  const context = myRizzLines
-    .map((line, i) => `Technique ${i+1}: ${Object.values(line).join(' - ')}`)
-    .join('\n');
-
   try {
+    const myRizzLines = await fetchRizzData();
+    
+    // On nettoie les données pour ne pas envoyer n'importe quoi à l'API
+    const context = myRizzLines
+      .filter(line => line && Object.values(line).some(v => v))
+      .slice(0, 15) // On limite aux 15 premières lignes pour ne pas saturer l'API
+      .map((line, i) => `Technique ${i+1}: ${Object.values(line).join(' - ')}`)
+      .join('\n');
+
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -20,18 +22,11 @@ export const generateRizzResponse = async (userMessage) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192", // Modèle ultra rapide et gratuit
+        model: "llama3-8b-8192",
         messages: [
           {
             role: "system",
-            content: `Tu es RizzUp Coach, un expert en séduction et charisme. 
-            Voici ta base de connaissances (ton Sheets) :
-            ${context}
-            
-            Instructions :
-            1. Utilise les techniques du Sheets pour répondre.
-            2. Si la question est générale (bonjour, etc.), sois cool et charismatique.
-            3. Réponds toujours en français, de façon courte et percutante.`
+            content: `Tu es RizzUp Coach. Utilise ce contexte : ${context}. Réponds en français, court et stylé.`
           },
           {
             role: "user",
@@ -43,10 +38,21 @@ export const generateRizzResponse = async (userMessage) => {
     });
 
     const data = await response.json();
-    return data.choices[0].message.content;
+
+    // SÉCURITÉ : On vérifie si l'API a renvoyé une erreur (ex: clé bloquée)
+    if (data.error) {
+      console.error("Erreur API Groq:", data.error.message);
+      return "Désolé, ma clé API semble bloquée par GitHub ou invalide. Regénère une clé sur Groq !";
+    }
+
+    if (data.choices && data.choices[0]) {
+      return data.choices[0].message.content;
+    }
+    
+    return "Je n'ai pas pu formuler de réponse. Réessaie ?";
 
   } catch (error) {
-    console.error("Erreur Groq:", error);
-    return "Désolé, mon cerveau est en surchauffe. Vérifie ta clé API !";
+    console.error("Erreur Catch:", error);
+    return "Problème de connexion. Vérifie ta console !";
   }
 };
