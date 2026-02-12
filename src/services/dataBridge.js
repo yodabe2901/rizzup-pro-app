@@ -1,27 +1,28 @@
-/**
- * DATABRIDGE - Sécurise les flux de données sans toucher aux prompts IA
- */
+const PUB_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSWrcgV63CM7eC7xw6IsGfc-ZAUOR3Rr2auTa6mofspsFDAFePdYgi3PYsMaKQ49bE3hYMASf5VJNLx/pub?output=csv";
 
-// Nettoyage spécifique pour le format bizarre de Google Sheets
-export const cleanSheetsResponse = (rawText) => {
+export const getSheetsData = async () => {
   try {
-    const match = rawText.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\)/);
-    if (!match || !match[1]) return null;
-    const json = JSON.parse(match[1]);
-    return json.table.rows
-      .map(row => (row.c && row.c[0] ? row.c[0].v : null))
-      .filter(v => v !== null);
-  } catch (e) {
-    console.error("Bridge Error: Format JSON Sheets invalide", e);
-    return null;
-  }
-};
+    const res = await fetch(PUB_URL);
+    
+    // Si Google Sheets ne répond pas bien
+    if (!res.ok) {
+      console.warn("Sheets non accessible, retour d'un tableau vide.");
+      return []; 
+    }
 
-// Vérificateur de Clé API pour éviter les erreurs 401 silencieuses
-export const checkApiConfig = (key) => {
-  if (!key || key.length < 10) {
-    console.warn("⚠️ BRIDGE WARNING: Clé API Groq manquante ou trop courte.");
-    return false;
+    const csvText = await res.text();
+    
+    // On transforme le texte en tableau de lignes
+    const lines = csvText.split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line.length > 2); // On ignore les lignes vides
+
+    // GARANTIE : On renvoie toujours un tableau, même vide
+    return Array.isArray(lines) ? lines : [];
+
+  } catch (error) {
+    // AU LIEU DE REVOYER CONSOLE.ERROR, ON RENVOIE UN TABLEAU VIDE
+    console.error("Erreur critique dataService:", error);
+    return []; 
   }
-  return true;
 };
