@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchRizzData, generateRizzResponse } from './services/ai';
 import { 
-  MessageSquare, Users, BookOpen, Settings, 
-  LayoutDashboard, Send, Zap, Trophy, ArrowRight, Bot, User 
+  MessageSquare, BookOpen, Settings, 
+  LayoutDashboard, Send, Zap, Trophy, ArrowRight, Bot 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown'; // Run: npm install react-markdown
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
@@ -36,33 +37,30 @@ export default function App() {
           {activeTab === 'home' && <HomeDashboard key="home" stats={{count: rizzLibrary.length}} setTab={setActiveTab} />}
           {activeTab === 'chat' && <RizzAIChat key="chat" />}
           {activeTab === 'academy' && <AcademyPage key="academy" library={rizzLibrary} />}
-          {activeTab === 'feed' && <ComingSoon title="Social Feed" />}
-          {activeTab === 'settings' && <ComingSoon title="Profile" />}
+          {activeTab === 'settings' && <ComingSoon title="Account Settings" />}
         </AnimatePresence>
       </main>
 
-      {/* Premium Navigation Bar */}
+      {/* Navigation */}
       <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[400px] bg-zinc-900/80 backdrop-blur-3xl border border-white/10 rounded-[35px] p-2 flex justify-between items-center z-50 shadow-2xl">
         <NavBtn active={activeTab === 'home'} onClick={() => setActiveTab('home')} icon={<LayoutDashboard size={20}/>} label="Home" />
         <NavBtn active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<MessageSquare size={20}/>} label="AI Chat" />
-        <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-600/40 -mt-12 border-[6px] border-[#050505] active:scale-90 transition-transform">
+        <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-600/40 -mt-12 border-[6px] border-[#050505]">
             <Zap size={24} fill="white" />
         </div>
         <NavBtn active={activeTab === 'academy'} onClick={() => setActiveTab('academy')} icon={<BookOpen size={20}/>} label="Library" />
-        <NavBtn active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={20}/>} label="Account" />
+        <NavBtn active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={20}/>} label="Profile" />
       </nav>
     </div>
   );
 }
 
-// --- RIZZ AI CHAT WITH RANDOM INTROS ---
 function RizzAIChat() {
   const intros = [
     "Yo. RizzMaster here. What's the move today?",
     "Status check. Ready to upgrade your social game?",
-    "Talk to me. What kind of fire are we lighting today?",
-    "The world is yours. How can I help you take it?",
-    "Elite mode activated. Who's the target?"
+    "Elite mode activated. Who's the target?",
+    "The world is yours. How can I help you take it?"
   ];
 
   const [messages, setMessages] = useState([
@@ -89,7 +87,7 @@ function RizzAIChat() {
       const response = await generateRizzResponse(userText);
       setMessages(prev => [...prev, { role: 'ai', text: response }]);
     } catch (e) {
-      setMessages(prev => [...prev, { role: 'ai', text: "Connection lost. Try again, champ." }]);
+      setMessages(prev => [...prev, { role: 'ai', text: "Signal lost. Re-engaging..." }]);
     } finally {
       setIsTyping(false);
     }
@@ -101,7 +99,7 @@ function RizzAIChat() {
         <h2 className="text-xl font-black italic uppercase text-blue-500 tracking-tighter">RizzMaster AI</h2>
         <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Mastery Online</span>
+            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Mastery Active</span>
         </div>
       </header>
 
@@ -109,9 +107,16 @@ function RizzAIChat() {
         {messages.map((m, i) => (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i} 
             className={`flex ${m.role === 'ai' ? 'justify-start' : 'justify-end'} items-end gap-3`}>
-            {m.role === 'ai' && <div className="w-8 h-8 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center"><Bot size={16} className="text-blue-500"/></div>}
-            <div className={`max-w-[85%] p-4 rounded-[24px] text-sm leading-relaxed shadow-2xl whitespace-pre-wrap ${m.role === 'ai' ? 'bg-zinc-900 border border-white/10 rounded-bl-none' : 'bg-blue-600 text-white rounded-br-none font-medium'}`}>
-              {m.text}
+            {m.role === 'ai' && <div className="w-8 h-8 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center flex-shrink-0"><Bot size={16} className="text-blue-500"/></div>}
+            <div className={`max-w-[85%] p-4 rounded-[24px] text-sm shadow-2xl ${
+              m.role === 'ai' 
+                ? 'bg-zinc-900 border border-white/10 rounded-bl-none text-zinc-200' 
+                : 'bg-blue-600 text-white rounded-br-none font-medium'
+            }`}>
+              {/* This component handles the **bold** and line breaks */}
+              <ReactMarkdown className="whitespace-pre-wrap break-words leading-relaxed">
+                {m.text}
+              </ReactMarkdown>
             </div>
           </motion.div>
         ))}
@@ -129,7 +134,7 @@ function RizzAIChat() {
           <input 
             value={input} onChange={(e)=>setInput(e.target.value)} 
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Type your message..." 
+            placeholder="Talk to me..." 
             className="bg-transparent flex-1 p-3 outline-none text-sm font-medium placeholder:text-zinc-600" 
           />
           <button onClick={handleSend} className="bg-blue-600 text-white p-3 rounded-[20px] hover:bg-blue-500 active:scale-90 transition-all shadow-lg shadow-blue-600/30">
@@ -141,33 +146,38 @@ function RizzAIChat() {
   );
 }
 
-// --- HOME DASHBOARD ---
 function HomeDashboard({ stats, setTab }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 pt-16 h-full overflow-y-auto no-scrollbar">
       <div className="flex justify-between items-start mb-10">
         <div>
-            <h1 className="text-4xl font-black italic text-white uppercase tracking-tighter leading-none">RizzMaster<span className="text-blue-600">.</span></h1>
-            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.4em] mt-2">Status: Alpha 1.0</p>
+            <h1 className="text-4xl font-black italic text-white uppercase tracking-tighter leading-none text-left">RizzMaster<span className="text-blue-600">.</span></h1>
+            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.4em] mt-2 text-left">Level: Alpha 1.0</p>
         </div>
         <div className="w-12 h-12 bg-zinc-900 border border-white/10 rounded-2xl flex items-center justify-center">
             <Trophy size={20} className="text-yellow-500" />
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-blue-700 to-indigo-900 p-8 rounded-[40px] mb-8 relative overflow-hidden group shadow-2xl shadow-blue-900/20">
-        <div className="absolute -top-4 -right-4 p-6 opacity-10 group-hover:scale-110 transition-transform"><Zap size={120} /></div>
-        <h3 className="text-4xl font-black italic mb-2">{stats.count}</h3>
-        <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em]">Active Masteries Loaded</p>
+      <div className="bg-gradient-to-br from-blue-700 to-indigo-900 p-8 rounded-[40px] mb-8 relative overflow-hidden shadow-2xl shadow-blue-900/20">
+        <div className="absolute -top-4 -right-4 p-6 opacity-10"><Zap size={120} /></div>
+        <h3 className="text-4xl font-black italic mb-2 text-left">{stats.count}</h3>
+        <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em] text-left">Expertise Modules Loaded</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-8">
-        <StatCard label="Influence" val="1.4k" />
-        <StatCard label="Global Rank" val="#09" />
+        <div className="bg-zinc-900/50 border border-white/5 p-6 rounded-[30px] backdrop-blur-sm">
+            <p className="text-zinc-600 text-[10px] font-bold uppercase mb-1 tracking-widest text-left">Influence</p>
+            <p className="text-2xl font-black italic text-left text-white">1.4k</p>
+        </div>
+        <div className="bg-zinc-900/50 border border-white/5 p-6 rounded-[30px] backdrop-blur-sm">
+            <p className="text-zinc-600 text-[10px] font-bold uppercase mb-1 tracking-widest text-left">Global Rank</p>
+            <p className="text-2xl font-black italic text-left text-white">#09</p>
+        </div>
       </div>
 
       <button onClick={() => setTab('chat')} className="w-full bg-white text-black p-6 rounded-[32px] flex justify-between items-center font-black italic uppercase group hover:bg-blue-600 hover:text-white transition-all">
-        <span>Access AI Terminal</span>
+        <span>Open Terminal</span>
         <ArrowRight className="group-hover:translate-x-2 transition-transform" />
       </button>
     </motion.div>
@@ -177,26 +187,17 @@ function HomeDashboard({ stats, setTab }) {
 function AcademyPage({ library }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 pt-16 h-full overflow-y-auto no-scrollbar pb-40">
-      <h2 className="text-3xl font-black italic uppercase mb-8 border-l-4 border-blue-600 pl-4 tracking-tighter">Technique Library</h2>
+      <h2 className="text-3xl font-black italic uppercase mb-8 border-l-4 border-blue-600 pl-4 tracking-tighter text-left">Knowledge Base</h2>
       <div className="space-y-4">
         {library.map((item, i) => (
-          <div key={i} className="bg-zinc-900/50 border border-white/5 p-6 rounded-[30px] hover:border-blue-500/30 transition-colors group">
-            <span className="text-blue-600 text-[9px] font-black uppercase tracking-[0.2em] mb-2 block">Technique #{i+1}</span>
-            <p className="text-lg font-bold italic group-hover:text-blue-400 transition-colors">"{Object.values(item)[0]}"</p>
+          <div key={i} className="bg-zinc-900/50 border border-white/5 p-6 rounded-[30px] group">
+            <span className="text-blue-600 text-[9px] font-black uppercase tracking-[0.2em] mb-2 block text-left">Technique #{i+1}</span>
+            <p className="text-lg font-bold italic text-left text-white group-hover:text-blue-400 transition-colors italic">"{Object.values(item)[0]}"</p>
           </div>
         ))}
       </div>
     </motion.div>
   );
-}
-
-function StatCard({ label, val }) {
-    return (
-        <div className="bg-zinc-900/50 border border-white/5 p-6 rounded-[30px] backdrop-blur-sm">
-            <p className="text-zinc-600 text-[10px] font-bold uppercase mb-1 tracking-widest">{label}</p>
-            <p className="text-2xl font-black italic">{val}</p>
-        </div>
-    )
 }
 
 function ComingSoon({ title }) {
