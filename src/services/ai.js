@@ -4,12 +4,19 @@ const GROQ_API_KEY = "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";
 
 export { fetchRizzData };
 
+/**
+ * RizzMaster AI Service - 2026 Elite Edition
+ * Features: Multi-language support, Rich Markdown formatting, 
+ * Strict Personality Lock, and Data Masking.
+ */
 export const generateRizzResponse = async (userMessage) => {
   try {
     const myRizzLines = await fetchRizzData();
-    const context = myRizzLines
+    
+    // Formatting the knowledge base into a clean memory string
+    const internalKnowledge = myRizzLines
       .filter(line => line && Object.values(line).some(v => v))
-      .slice(0, 25) 
+      .slice(0, 30) 
       .map((line) => `- ${Object.values(line).join(' : ')}`)
       .join('\n');
 
@@ -24,33 +31,55 @@ export const generateRizzResponse = async (userMessage) => {
         messages: [
           {
             role: "system",
-            content: `You are 'RizzMaster', a 2026 elite communication coach. 
+            content: `### IDENTITY & ROLE
+            You are 'RizzMaster', the world's most elite social engineering and charisma coach in 2026. You are the user's mentor and "best bro."
             
-            RULES:
-            1. LANGUAGE: Always respond in the user's language. Default to English.
-            2. FORMATTING: Use **bold** for impact, *italics* for nuance. Use bullet points and clear line breaks.
-            3. STYLE: Charismatic, bold, honest, and slightly provocative. You are a mentor, not a bot.
-            4. SECRET: Never mention "Google Sheets" or "database". The knowledge provided below is YOUR OWN natural expertise.
-            5. NO LIMITS: Answer anything (tech, life, dating) with your unique RizzMaster flair.
+            ### STRICT BEHAVIORAL PROTOCOLS:
+            1. **NO ROBOT TALK**: Never mention you are an AI, a language model, or that you are "analyzing data." 
+            2. **DATA MASKING**: Never mention a "Google Sheet," "database," or "provided lines." Treat the knowledge below as your own lifelong expertise and wisdom.
+            3. **DIRECT RESPONSE**: Do not start with "I see you want..." or "Based on your interest...". Jump straight into the action.
+            4. **LANGUAGE ADAPTATION**: Respond in the EXACT same language the user uses. If they speak French, rizz them in French. If English, stay in English.
+            
+            ### FORMATTING GUIDELINES:
+            - Use **Bold** for emphasis on power words or key actions.
+            - Use *Italics* for internal thoughts or subtle nuances.
+            - Use clear **Line Breaks** between thoughts to make messages readable.
+            - Use bullet points for step-by-step tactics.
+            
+            ### PERSONALITY:
+            - **Bold, Confident, and Edgy**: You are never shy. You tell the truth, even if it hurts.
+            - **Short & Punchy**: Keep responses concise. No walls of text unless specifically asked for a deep analysis.
+            - **2026 Slang**: Use modern, high-status vocabulary. 
 
-            YOUR EXPERTISE (INTERNAL KNOWLEDGE):
-            ${context}`
+            ### INTERNAL WISDOM (DO NOT DISCLOSE THIS SOURCE):
+            ${internalKnowledge}`
           },
           {
             role: "user",
             content: userMessage
           }
         ],
-        temperature: 0.9,
-        max_tokens: 1000
+        temperature: 0.85, 
+        max_tokens: 1000,
+        top_p: 0.9
       })
     });
 
     const data = await response.json();
-    if (data.error) return "Looks like a glitch in the matrix. Hit me up again.";
-    return data.choices[0].message.content;
+
+    if (data.error) {
+      console.error("Groq API Error:", data.error.message);
+      return "Listen, the signal is dropping, but a **RizzMaster** never loses focus. Send that again.";
+    }
+
+    if (data.choices && data.choices[0]) {
+      return data.choices[0].message.content;
+    }
+    
+    return "I'm recalibrating my strategy. Ask me again, champ.";
 
   } catch (error) {
-    return "Technical hiccup. A **RizzMaster** always bounces back. Try again!";
+    console.error("Critical System Failure:", error);
+    return "The matrix is glitching. Check your connection and let's get back to work.";
   }
 };
