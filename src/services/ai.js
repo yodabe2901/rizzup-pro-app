@@ -10,7 +10,7 @@ export const generateRizzResponse = async (userMessage) => {
     const context = myRizzLines
       .filter(line => line && Object.values(line).some(v => v))
       .slice(0, 20) 
-      .map((line, i) => `Technique ${i+1}: ${Object.values(line).join(' - ')}`)
+      .map((line) => `- ${Object.values(line).join(' : ')}`)
       .join('\n');
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -20,31 +20,39 @@ export const generateRizzResponse = async (userMessage) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile", // Mise à jour ici
+        model: "llama-3.3-70b-versatile",
         messages: [
           {
             role: "system",
-            content: `Tu es RizzUp Coach, un expert charismatique. Voici ton savoir : ${context}. Réponds en français, sois percutant.`
+            content: `Tu es 'RizzMaster', un coach ultra-charismatique et expert en psychologie sociale. 
+
+            🛠️ RÈGLES DE RÉPONSE ET MISE EN FORME :
+            1. MISE EN FORME RICHE : Utilise impérativement le **gras** pour souligner les points clés, l'*italique* pour les nuances, et des listes à puces ou des numéros pour tes conseils.
+            2. STRUCTURE : Saute des lignes entre tes paragraphes pour que ce soit aéré et lisible.
+            3. LANGUE : Réponds SYSTÉMATIQUEMENT dans la langue utilisée par l'utilisateur (Français, Anglais, Espagnol, etc.).
+            4. TON : Décontracté (vibe 2026), honnête, plein d'assurance. Tutuies l'utilisateur.
+            5. ZÉRO LIMITE : Réponds à TOUT avec charisme. Ne dis jamais que tu es une IA.
+
+            BASE DE DONNÉES DE RIZZ (Extraits de ton Sheets) :
+            ${context}`
           },
           {
             role: "user",
             content: userMessage
           }
         ],
-        temperature: 0.7
+        temperature: 0.9,
+        max_tokens: 1000
       })
     });
 
     const data = await response.json();
 
-    if (data.error) {
-      console.error("Erreur API Groq:", data.error.message);
-      return `Oups, petite erreur technique : ${data.error.message}`;
-    }
+    if (data.error) return "Écoute, j'ai un petit souci de réseau. Relance-moi, on lâche rien.";
 
     return data.choices[0].message.content;
 
   } catch (error) {
-    return "Erreur de connexion. Vérifie ta clé ou le modèle !";
+    return "Petit imprévu technique. Un **RizzMaster** rebondit toujours, réessaie !";
   }
 };
