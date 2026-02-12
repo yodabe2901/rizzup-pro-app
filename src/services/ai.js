@@ -1,46 +1,52 @@
 import { fetchRizzData } from './data';
 
+const GROQ_API_KEY = "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"; // <--- COLLE TA CLÉ ICI
+
 export { fetchRizzData };
 
 export const generateRizzResponse = async (userMessage) => {
-  const input = userMessage.toLowerCase().trim();
-  
-  // 1. GESTION DES SALUTATIONS (Le "Cerveau" social)
-  const greetings = ['bonjour', 'salut', 'hello', 'ca va', 'ça va', 'wesh', 'yo'];
-  if (greetings.some(g => input.includes(g))) {
-    const helloResponses = [
-      "Salut ! Prêt à devenir un maître du Rizz ? Pose-moi une question ou demande-moi une technique.",
-      "Yo ! Je suis connecté à ton Sheets. On booste ton game aujourd'hui ?",
-      "Hello ! Dis-moi ce qu'il te faut : une bio, une phrase d'accroche ou un conseil ?"
-    ];
-    return helloResponses[Math.floor(Math.random() * helloResponses.length)];
-  }
-
-  // 2. RÉCUPÉRATION DES DONNÉES DU SHEETS
   const myRizzLines = await fetchRizzData();
   
-  // On filtre pour éviter les lignes vides
-  const cleanData = myRizzLines.filter(line => Object.values(line).some(v => v && v.length > 0));
+  // On transforme ton Sheets en texte pour l'IA
+  const context = myRizzLines
+    .map((line, i) => `Technique ${i+1}: ${Object.values(line).join(' - ')}`)
+    .join('\n');
 
-  if (cleanData.length === 0) {
-    return "Ton Sheets est vide ! Ajoute des phrases dans la colonne 'RizzLine' pour que je puisse t'aider.";
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama3-8b-8192", // Modèle ultra rapide et gratuit
+        messages: [
+          {
+            role: "system",
+            content: `Tu es RizzUp Coach, un expert en séduction et charisme. 
+            Voici ta base de connaissances (ton Sheets) :
+            ${context}
+            
+            Instructions :
+            1. Utilise les techniques du Sheets pour répondre.
+            2. Si la question est générale (bonjour, etc.), sois cool et charismatique.
+            3. Réponds toujours en français, de façon courte et percutante.`
+          },
+          {
+            role: "user",
+            content: userMessage
+          }
+        ],
+        temperature: 0.7
+      })
+    });
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+
+  } catch (error) {
+    console.error("Erreur Groq:", error);
+    return "Désolé, mon cerveau est en surchauffe. Vérifie ta clé API !";
   }
-
-  // 3. RECHERCHE SÉMANTIQUE (Match avec le Sheets)
-  let match = cleanData.find(line => {
-    const text = Object.values(line).join(" ").toLowerCase();
-    return input.split(' ').some(word => word.length > 3 && text.includes(word));
-  });
-
-  // Si pas de match précis, on prend une ligne au hasard
-  const result = match || cleanData[Math.floor(Math.random() * cleanData.length)];
-  
-  // Sécurité contre le "undefined" : on cherche n'importe quelle valeur textuelle dans la ligne
-  const rizzPhrase = result.RizzLine || Object.values(result).find(v => v && v.length > 1) || "Reste toi-même, c'est ton meilleur atout.";
-
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(`Analyse de ton Sheets terminée : "${rizzPhrase}"`);
-    }, 800);
-  });
 };
