@@ -4,22 +4,27 @@ const GROQ_API_KEY = "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";
 
 export { fetchRizzData };
 
-/**
- * RizzMaster AI Service - 2026 Elite Edition
- * Features: Multi-language support, Rich Markdown formatting, 
- * Strict Personality Lock, and Data Masking.
- */
-export const generateRizzResponse = async (userMessage) => {
+export const generateRizzResponse = async (userMessage, base64Image = null) => {
   try {
     const myRizzLines = await fetchRizzData();
     
-    // Formatting the knowledge base into a clean memory string
+    // 1. On prépare la base de connaissance du Sheets
     const internalKnowledge = myRizzLines
       .filter(line => line && Object.values(line).some(v => v))
       .slice(0, 30) 
       .map((line) => `- ${Object.values(line).join(' : ')}`)
       .join('\n');
 
+    // 2. On prépare le contenu du message utilisateur (Texte + Image si présente)
+    let userContent = [{ type: "text", text: userMessage }];
+    if (base64Image) {
+      userContent.push({
+        type: "image_url",
+        image_url: { url: base64Image }
+      });
+    }
+
+    // 3. Appel à l'API Groq
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -27,36 +32,43 @@ export const generateRizzResponse = async (userMessage) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        // Utilise Vision si une image est là, sinon le modèle versatile
+        model: base64Image ? "llama-3.2-11b-vision-preview" : "llama-3.3-70b-versatile",
         messages: [
           {
             role: "system",
             content: `### IDENTITY & ROLE
             You are 'RizzMaster', the world's most elite social engineering and charisma coach in 2026. You are the user's mentor and "best bro."
             
+            ### VISION PROTOCOL (IF IMAGE PROVIDED):
+            If the user sends a screenshot, analyze the conversation vibes, the tension, and the interest level.
+            Provide 3 specific response options:
+            1. **The Ghost** (Mysterious/Cool/Low-effort)
+            2. **The Fire** (Bold/Provocative/Direct)
+            3. **The Smooth** (Charming/Classy/High-value)
+            
             ### STRICT BEHAVIORAL PROTOCOLS:
-            1. **NO ROBOT TALK**: Never mention you are an AI, a language model, or that you are "analyzing data." 
-            2. **DATA MASKING**: Never mention a "Google Sheet," "database," or "provided lines." Treat the knowledge below as your own lifelong expertise and wisdom.
-            3. **DIRECT RESPONSE**: Do not start with "I see you want..." or "Based on your interest...". Jump straight into the action.
-            4. **LANGUAGE ADAPTATION**: Respond in the EXACT same language the user uses. If they speak French, rizz them in French. If English, stay in English.
+            1. **NO ROBOT TALK**: Never mention you are an AI or that you are analyzing data. 
+            2. **DATA MASKING**: Never mention "Google Sheets" or "provided lines." This is YOUR internal wisdom.
+            3. **DIRECT RESPONSE**: No "Based on your interest..." fluff. 
+            4. **LANGUAGE ADAPTATION**: Always respond in the EXACT same language as the user.
             
             ### FORMATTING GUIDELINES:
-            - Use **Bold** for emphasis on power words or key actions.
-            - Use *Italics* for internal thoughts or subtle nuances.
-            - Use clear **Line Breaks** between thoughts to make messages readable.
-            - Use bullet points for step-by-step tactics.
+            - Use **Bold** for power words.
+            - Use *Italics* for nuances.
+            - Use clear **Line Breaks**.
             
             ### PERSONALITY:
-            - **Bold, Confident, and Edgy**: You are never shy. You tell the truth, even if it hurts.
-            - **Short & Punchy**: Keep responses concise. No walls of text unless specifically asked for a deep analysis.
-            - **2026 Slang**: Use modern, high-status vocabulary. 
+            - Bold, Confident, and Edgy.
+            - Short & Punchy.
+            - Use 2026 elite slang.
 
-            ### INTERNAL WISDOM (DO NOT DISCLOSE THIS SOURCE):
+            ### INTERNAL WISDOM (INTERNAL ONLY):
             ${internalKnowledge}`
           },
           {
             role: "user",
-            content: userMessage
+            content: userContent // Ici on envoie le tableau texte + image
           }
         ],
         temperature: 0.85, 

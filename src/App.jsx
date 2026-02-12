@@ -1,221 +1,108 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { fetchRizzData, generateRizzResponse } from './services/ai';
-import { 
-  MessageSquare, BookOpen, Settings, 
-  LayoutDashboard, Send, Zap, Trophy, ArrowRight, Bot 
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { fetchRizzData } from './services/ai';
+import { LayoutDashboard, MessageSquare, BookOpen, Settings, Zap, Search, Clapperboard, User, PlusSquare } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 
-// NOTE: We removed react-markdown to fix the build error
+// --- IMPORT DES COMPOSANTS ---
+import Home from './components/Home';
+import Chat from './components/Chat';
+import Library from './components/Library';
+import InstantRizz from './components/InstantRizz';
+
 export default function App() {
+  // États de l'application
   const [activeTab, setActiveTab] = useState('home');
   const [rizzLibrary, setRizzLibrary] = useState([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [favorites, setFavorites] = useState([]);
+  const [isInstantOpen, setIsInstantOpen] = useState(false);
 
+  // Initialisation (Data + LocalStorage)
   useEffect(() => {
-    async function initApp() {
-      try {
-        const data = await fetchRizzData();
-        setRizzLibrary(data || []);
-      } catch (error) { console.error(error); }
-      finally { setIsLoaded(true); }
+    async function init() {
+      const data = await fetchRizzData();
+      setRizzLibrary(data || []);
+      const saved = localStorage.getItem('rizz_favs');
+      if (saved) setFavorites(JSON.parse(saved));
     }
-    initApp();
+    init();
   }, []);
 
-  if (!isLoaded) return (
-    <div className="bg-black h-screen flex flex-col items-center justify-center">
-      <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-      <h1 className="text-blue-500 font-black italic animate-pulse text-2xl uppercase tracking-[0.2em]">RizzMaster OS</h1>
-    </div>
-  );
+  // Logique des favoris
+  const toggleFavorite = (text) => {
+    const newFavs = favorites.includes(text) 
+      ? favorites.filter(f => f !== text) 
+      : [...favorites, text];
+    setFavorites(newFavs);
+    localStorage.setItem('rizz_favs', JSON.stringify(newFavs));
+  };
 
   return (
-    <div className="bg-[#050505] min-h-screen text-white font-sans overflow-hidden">
-      <main className="max-w-md mx-auto h-screen relative overflow-hidden shadow-[0_0_100px_rgba(37,99,235,0.1)]">
+    <div className="bg-black min-h-screen text-white font-sans overflow-hidden">
+      <main className="max-w-md mx-auto h-screen relative overflow-hidden shadow-2xl shadow-blue-500/10">
+        
         <AnimatePresence mode="wait">
-          {activeTab === 'home' && <HomeDashboard key="home" stats={{count: rizzLibrary.length}} setTab={setActiveTab} />}
-          {activeTab === 'chat' && <RizzAIChat key="chat" />}
-          {activeTab === 'academy' && <AcademyPage key="academy" library={rizzLibrary} />}
-          {activeTab === 'settings' && <ComingSoon title="Account Settings" />}
+          {/* PAGE ACCUEIL (Style Instagram) */}
+          {activeTab === 'home' && (
+            <Home key="home" library={rizzLibrary} />
+          )}
+
+          {/* PAGE CHAT (IA + Vision) */}
+          {activeTab === 'chat' && (
+            <Chat key="chat" onFav={toggleFavorite} favorites={favorites} />
+          )}
+
+          {/* PAGE LIBRARY (Database) */}
+          {activeTab === 'library' && (
+            <Library key="library" library={rizzLibrary} favorites={favorites} onFav={toggleFavorite} />
+          )}
+
+          {/* PAGE PROFILE (Placeholder) */}
+          {activeTab === 'profile' && (
+            <div className="flex items-center justify-center h-full text-zinc-500 font-bold uppercase italic">
+              User Profile @yodabe2901
+            </div>
+          )}
         </AnimatePresence>
+
+        {/* COMPOSANT INSTANT RIZZ (Pop-up Éclair) */}
+        <InstantRizz isOpen={isInstantOpen} onClose={() => setIsInstantOpen(false)} />
+
       </main>
 
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[400px] bg-zinc-900/80 backdrop-blur-3xl border border-white/10 rounded-[35px] p-2 flex justify-between items-center z-50 shadow-2xl">
-        <NavBtn active={activeTab === 'home'} onClick={() => setActiveTab('home')} icon={<LayoutDashboard size={20}/>} label="Home" />
-        <NavBtn active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<MessageSquare size={20}/>} label="AI Chat" />
-        <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-600/40 -mt-12 border-[6px] border-[#050505]">
-            <Zap size={24} fill="white" />
-        </div>
-        <NavBtn active={activeTab === 'academy'} onClick={() => setActiveTab('academy')} icon={<BookOpen size={20}/>} label="Library" />
-        <NavBtn active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={20}/>} label="Profile" />
+      {/* --- BARRE DE NAVIGATION (Style Instagram) --- */}
+      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-black border-t border-white/10 px-6 py-3 flex justify-between items-center z-[100]">
+        
+        <NavBtn active={activeTab === 'home'} onClick={() => setActiveTab('home')} icon={<LayoutDashboard size={26}/>} />
+        
+        <NavBtn active={activeTab === 'search'} onClick={() => setActiveTab('search')} icon={<Search size={26}/>} />
+        
+        {/* BOUTON CENTRAL ACTION (L'Éclair Magique) */}
+        <button 
+          onClick={() => setIsInstantOpen(true)}
+          className="p-1 active:scale-75 transition-transform"
+        >
+          <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 p-2 rounded-lg shadow-lg shadow-blue-500/20">
+            <Zap size={22} fill="white" className="text-white" />
+          </div>
+        </button>
+
+        <NavBtn active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<MessageSquare size={26}/>} />
+        
+        <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<User size={26}/>} />
+        
       </nav>
     </div>
   );
 }
 
-function RizzAIChat() {
-  const intros = [
-    "Yo. RizzMaster here. What's the move today?",
-    "Status check. Ready to upgrade your social game?",
-    "Elite mode activated. Who's the target?",
-    "The world is yours. How can I help you take it?"
-  ];
-
-  const [messages, setMessages] = useState([
-    { role: 'ai', text: intros[Math.floor(Math.random() * intros.length)] }
-  ]);
-  const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isTyping]);
-
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    const userText = input;
-    setMessages(prev => [...prev, { role: 'user', text: userText }]);
-    setInput("");
-    setIsTyping(true);
-
-    try {
-      const response = await generateRizzResponse(userText);
-      setMessages(prev => [...prev, { role: 'ai', text: response }]);
-    } catch (e) {
-      setMessages(prev => [...prev, { role: 'ai', text: "Signal lost. Re-engaging..." }]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
+// Composant pour les icônes de la barre Instagram
+function NavBtn({ active, onClick, icon }) {
   return (
-    <div className="flex flex-col h-full bg-black">
-      <header className="p-6 pt-12 border-b border-white/5 bg-black/50 backdrop-blur-md z-10">
-        <h2 className="text-xl font-black italic uppercase text-blue-500 tracking-tighter">RizzMaster AI</h2>
-        <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Mastery Active</span>
-        </div>
-      </header>
-
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar pt-6 pb-44">
-        {messages.map((m, i) => (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i} 
-            className={`flex ${m.role === 'ai' ? 'justify-start' : 'justify-end'} items-end gap-3`}>
-            {m.role === 'ai' && <div className="w-8 h-8 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center flex-shrink-0"><Bot size={16} className="text-blue-500"/></div>}
-            <div className={`max-w-[85%] p-4 rounded-[24px] text-sm shadow-2xl ${
-              m.role === 'ai' 
-                ? 'bg-zinc-900 border border-white/10 rounded-bl-none text-zinc-200' 
-                : 'bg-blue-600 text-white rounded-br-none font-medium text-left'
-            }`}>
-              {/* Clean text display without external library */}
-              <div className="whitespace-pre-wrap break-words leading-relaxed text-left">
-                {m.text.split('**').map((part, index) => 
-                  index % 2 === 1 ? <b key={index} className="text-blue-400 font-black">{part}</b> : part
-                )}
-              </div>
-            </div>
-          </motion.div>
-        ))}
-        {isTyping && (
-          <div className="flex gap-1.5 p-4 bg-zinc-900/50 w-16 rounded-full justify-center animate-pulse ml-11">
-            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-          </div>
-        )}
-      </div>
-
-      <div className="absolute bottom-24 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent">
-        <div className="flex gap-2 bg-zinc-900 border border-white/10 p-2 rounded-[28px] backdrop-blur-xl shadow-2xl">
-          <input 
-            value={input} onChange={(e)=>setInput(e.target.value)} 
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Talk to me..." 
-            className="bg-transparent flex-1 p-3 outline-none text-sm font-medium placeholder:text-zinc-600" 
-          />
-          <button onClick={handleSend} className="bg-blue-600 text-white p-3 rounded-[20px] hover:bg-blue-500 active:scale-90 transition-all shadow-lg shadow-blue-600/30">
-            <Send size={20}/>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HomeDashboard({ stats, setTab }) {
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 pt-16 h-full overflow-y-auto no-scrollbar">
-      <div className="flex justify-between items-start mb-10">
-        <div>
-            <h1 className="text-4xl font-black italic text-white uppercase tracking-tighter leading-none text-left">RizzMaster<span className="text-blue-600">.</span></h1>
-            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.4em] mt-2 text-left">Level: Alpha 1.0</p>
-        </div>
-        <div className="w-12 h-12 bg-zinc-900 border border-white/10 rounded-2xl flex items-center justify-center">
-            <Trophy size={20} className="text-yellow-500" />
-        </div>
-      </div>
-
-      <div className="bg-gradient-to-br from-blue-700 to-indigo-900 p-8 rounded-[40px] mb-8 relative overflow-hidden shadow-2xl shadow-blue-900/20 text-left">
-        <div className="absolute -top-4 -right-4 p-6 opacity-10"><Zap size={120} /></div>
-        <h3 className="text-4xl font-black italic mb-2">{stats.count}</h3>
-        <p className="text-white/70 text-[10px] font-bold uppercase tracking-[0.2em]">Expertise Modules Loaded</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        <div className="bg-zinc-900/50 border border-white/5 p-6 rounded-[30px] backdrop-blur-sm">
-            <p className="text-zinc-600 text-[10px] font-bold uppercase mb-1 tracking-widest text-left">Influence</p>
-            <p className="text-2xl font-black italic text-left text-white">1.4k</p>
-        </div>
-        <div className="bg-zinc-900/50 border border-white/5 p-6 rounded-[30px] backdrop-blur-sm">
-            <p className="text-zinc-600 text-[10px] font-bold uppercase mb-1 tracking-widest text-left">Global Rank</p>
-            <p className="text-2xl font-black italic text-left text-white">#09</p>
-        </div>
-      </div>
-
-      <button onClick={() => setTab('chat')} className="w-full bg-white text-black p-6 rounded-[32px] flex justify-between items-center font-black italic uppercase group hover:bg-blue-600 hover:text-white transition-all">
-        <span>Open Terminal</span>
-        <ArrowRight className="group-hover:translate-x-2 transition-transform" />
-      </button>
-    </motion.div>
-  );
-}
-
-function AcademyPage({ library }) {
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 pt-16 h-full overflow-y-auto no-scrollbar pb-40">
-      <h2 className="text-3xl font-black italic uppercase mb-8 border-l-4 border-blue-600 pl-4 tracking-tighter text-left">Knowledge Base</h2>
-      <div className="space-y-4">
-        {library.map((item, i) => (
-          <div key={i} className="bg-zinc-900/50 border border-white/5 p-6 rounded-[30px] group">
-            <span className="text-blue-600 text-[9px] font-black uppercase tracking-[0.2em] mb-2 block text-left">Technique #{i+1}</span>
-            <p className="text-lg font-bold italic text-left text-white group-hover:text-blue-400 transition-colors">"{Object.values(item)[0]}"</p>
-          </div>
-        ))}
-      </div>
-    </motion.div>
-  );
-}
-
-function ComingSoon({ title }) {
-    return (
-        <div className="h-full flex flex-col items-center justify-center p-12 text-center">
-            <div className="w-20 h-20 bg-zinc-900 rounded-3xl flex items-center justify-center mb-6 border border-white/10 opacity-30"><Zap size={40}/></div>
-            <h2 className="text-2xl font-black italic uppercase text-zinc-800 tracking-tighter">{title}</h2>
-            <p className="text-zinc-500 text-[10px] font-bold uppercase mt-2 tracking-[0.2em]">Deployment in progress</p>
-        </div>
-    )
-}
-
-function NavBtn({ active, onClick, icon, label }) {
-  return (
-    <button onClick={onClick} className={`flex flex-col items-center p-3 rounded-2xl transition-all duration-300 ${active ? 'text-blue-500' : 'text-zinc-600 hover:text-zinc-400'}`}>
+    <button 
+      onClick={onClick} 
+      className={`p-2 transition-all duration-200 ${active ? 'text-white scale-110' : 'text-zinc-500 hover:text-zinc-300'}`}
+    >
       {icon}
-      <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">{label}</span>
     </button>
   );
 }
