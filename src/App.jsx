@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { fetchRizzData, generateRizzResponse } from './services/ai';
 import { createClient } from '@supabase/supabase-js';
 import { fetchRizzData, generateRizzResponse } from './ai'; // Import de ta logique Sheets
 import { MessageSquare, Users, BookOpen, Settings, LayoutDashboard, Send, Zap, Trophy, X } from 'lucide-react';
