@@ -7,17 +7,18 @@ import { AnimatePresence } from 'framer-motion';
 import Home from './components/Home';
 import Chat from './components/Chat';
 import Library from './components/Library';
-import Search from './components/Search'; // Nouvelle page
+import Search from './components/Search';
+import Profile from './components/Profile'; // La dernière pièce du puzzle
 import InstantRizz from './components/InstantRizz';
 
 export default function App() {
-  // États de l'application
+  // États globaux
   const [activeTab, setActiveTab] = useState('home');
   const [rizzLibrary, setRizzLibrary] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [isInstantOpen, setIsInstantOpen] = useState(false);
 
-  // Initialisation (Data + LocalStorage)
+  // Initialisation des données
   useEffect(() => {
     async function init() {
       try {
@@ -32,7 +33,7 @@ export default function App() {
     init();
   }, []);
 
-  // Gestion des favoris
+  // Gestion des favoris (accessible partout)
   const toggleFavorite = (text) => {
     const newFavs = favorites.includes(text) 
       ? favorites.filter(f => f !== text) 
@@ -51,31 +52,28 @@ export default function App() {
             <Home key="home" library={rizzLibrary} setTab={setActiveTab} />
           )}
 
-          {/* PAGE : RECHERCHE (Search) */}
+          {/* PAGE : RECHERCHE */}
           {activeTab === 'search' && (
             <Search key="search" library={rizzLibrary} />
           )}
 
-          {/* PAGE : CHAT (IA Terminal) */}
+          {/* PAGE : CHAT (L'IA avec Vision) */}
           {activeTab === 'chat' && (
             <Chat key="chat" onFav={toggleFavorite} favorites={favorites} />
           )}
 
-          {/* PAGE : LIBRARY (Database complète) */}
+          {/* PAGE : LIBRARY */}
           {activeTab === 'library' && (
             <Library key="library" library={rizzLibrary} favorites={favorites} onFav={toggleFavorite} />
           )}
 
-          {/* PAGE : PROFILE (À venir) */}
+          {/* PAGE : PROFILE (Nouveau) */}
           {activeTab === 'profile' && (
-            <div className="flex flex-col items-center justify-center h-full text-zinc-700 font-black italic uppercase">
-              <p className="text-xl">Profile Section</p>
-              <p className="text-[10px] tracking-[0.3em] mt-2">Elite Status: Loading...</p>
-            </div>
+            <Profile key="profile" favorites={favorites} library={rizzLibrary} />
           )}
         </AnimatePresence>
 
-        {/* COMPOSANT : INSTANT RIZZ (Action centrale Éclair) */}
+        {/* MODALE : INSTANT RIZZ (Activée par le bouton central) */}
         <InstantRizz isOpen={isInstantOpen} onClose={() => setIsInstantOpen(false)} />
 
       </main>
@@ -87,7 +85,7 @@ export default function App() {
         
         <NavBtn active={activeTab === 'search'} onClick={() => setActiveTab('search')} icon={<SearchIcon size={24}/>} />
         
-        {/* BOUTON ÉCLAIR (Quick Action) */}
+        {/* BOUTON ÉCLAIR (Action centrale) */}
         <button 
           onClick={() => setIsInstantOpen(true)}
           className="relative -top-2 active:scale-75 transition-transform"
@@ -99,14 +97,14 @@ export default function App() {
 
         <NavBtn active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<MessageSquare size={24}/>} />
         
-        <NavBtn active={activeTab === 'library'} onClick={() => setActiveTab('library')} icon={<BookOpen size={24}/>} />
+        <NavBtn active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<User size={24}/>} />
         
       </nav>
     </div>
   );
 }
 
-// Composant Interne pour les boutons de Nav
+// Composant interne pour les boutons de navigation
 function NavBtn({ active, onClick, icon }) {
   return (
     <button 
