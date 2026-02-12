@@ -7,11 +7,9 @@ export { fetchRizzData };
 export const generateRizzResponse = async (userMessage) => {
   try {
     const myRizzLines = await fetchRizzData();
-    
-    // On nettoie les données pour ne pas envoyer n'importe quoi à l'API
     const context = myRizzLines
       .filter(line => line && Object.values(line).some(v => v))
-      .slice(0, 15) // On limite aux 15 premières lignes pour ne pas saturer l'API
+      .slice(0, 20) 
       .map((line, i) => `Technique ${i+1}: ${Object.values(line).join(' - ')}`)
       .join('\n');
 
@@ -22,11 +20,11 @@ export const generateRizzResponse = async (userMessage) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model: "llama-3.3-70b-versatile", // Mise à jour ici
         messages: [
           {
             role: "system",
-            content: `Tu es RizzUp Coach. Utilise ce contexte : ${context}. Réponds en français, court et stylé.`
+            content: `Tu es RizzUp Coach, un expert charismatique. Voici ton savoir : ${context}. Réponds en français, sois percutant.`
           },
           {
             role: "user",
@@ -39,20 +37,14 @@ export const generateRizzResponse = async (userMessage) => {
 
     const data = await response.json();
 
-    // SÉCURITÉ : On vérifie si l'API a renvoyé une erreur (ex: clé bloquée)
     if (data.error) {
       console.error("Erreur API Groq:", data.error.message);
-      return "Désolé, ma clé API semble bloquée par GitHub ou invalide. Regénère une clé sur Groq !";
+      return `Oups, petite erreur technique : ${data.error.message}`;
     }
 
-    if (data.choices && data.choices[0]) {
-      return data.choices[0].message.content;
-    }
-    
-    return "Je n'ai pas pu formuler de réponse. Réessaie ?";
+    return data.choices[0].message.content;
 
   } catch (error) {
-    console.error("Erreur Catch:", error);
-    return "Problème de connexion. Vérifie ta console !";
+    return "Erreur de connexion. Vérifie ta clé ou le modèle !";
   }
 };
