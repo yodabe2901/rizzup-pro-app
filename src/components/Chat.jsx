@@ -4,8 +4,7 @@ import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { generateRizzResponse } from '../services/ai';
 
-// ON AJOUTE 'library' DANS LES PROPS ICI
-export default function Chat({ onFav, favorites, library }) { 
+export default function Chat({ onFav, favorites, library }) {
   const [messages, setMessages] = useState([{ role: 'ai', text: "Yo. Ready to spark some fire? Drop a message or a screenshot of your chat." }]);
   const [input, setInput] = useState("");
   const [image, setImage] = useState(null); 
@@ -30,9 +29,16 @@ export default function Chat({ onFav, favorites, library }) {
   const handleSend = async () => {
     if (!input.trim() && !image) return;
 
-    const userText = input || "Analyze this screenshot and give me the best move.";
+    // --- SÉCURITÉ ANTI-CRASH (L'erreur 'not iterable' vient d'ici) ---
+    // On transforme le Sheets en texte simple pour ne pas faire bugger l'IA
+    const sheetsContext = (library && Array.isArray(library) && library.length > 0) 
+      ? "\n\n[CONTEXTE SHEETS] : " + library.join(" | ")
+      : "";
+
+    const userText = input || "Analyze this screenshot.";
     const currentImg = image;
 
+    // On affiche le message propre de l'utilisateur (sans le texte du Sheets)
     setMessages(prev => [...prev, { role: 'user', text: userText, img: currentImg }]);
     
     setInput("");
@@ -40,12 +46,15 @@ export default function Chat({ onFav, favorites, library }) {
     setIsTyping(true);
 
     try {
-      // MODIFICATION ICI : On passe 'library' (le Sheets) à l'IA
-      // L'ordre est : texte, image, library
-      const response = await generateRizzResponse(userText, currentImg, library); 
+      // On fusionne le texte utilisateur et le Sheets pour l'IA
+      // On n'envoie que 2 arguments pour respecter ton fichier ai.js actuel
+      const combinedInput = userText + sheetsContext;
+      
+      const response = await generateRizzResponse(combinedInput, currentImg);
       
       setMessages(prev => [...prev, { role: 'ai', text: response }]);
     } catch (e) {
+      console.error("Chat Error:", e);
       setMessages(prev => [...prev, { role: 'ai', text: "Signal lost. The matrix is glitching." }]);
     } finally {
       setIsTyping(false);
