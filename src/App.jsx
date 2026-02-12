@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchRizzData } from './services/ai';
+import { getSheetsData as fetchRizzData } from './services/dataService';
 import { LayoutDashboard, MessageSquare, BookOpen, Settings, Zap, Search as SearchIcon, User } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 
