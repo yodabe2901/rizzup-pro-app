@@ -1,13 +1,11 @@
 /**
- * DATA SERVICE - Version Ultra-Stable
+ * DATA SERVICE - Version Publique (Lien de publication)
  */
 
-const SHEET_ID = "1p026z5M0w8DqWzY-T9U68xLInXfA6R_p6v7O8pL-yO8";
-// On utilise l'URL de base, le script ajoutera le formatage
-const URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+// Ton nouveau lien de publication converti en format CSV pour une lecture facile
+const PUB_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSWrcgV63CM7eC7xw6IsGfc-ZAUOR3Rr2auTa6mofspsFDAFePdYgi3PYsMaKQ49bE3hYMASf5VJNLx/pub?output=csv";
 
 export const getSheetsData = async () => {
-  // Liste de secours au cas où Google Sheets ferait encore des siennes
   const fallbackData = [
     "Le Rizz est un art, pas une science.",
     "Reste mystérieux, laisse-la poser les questions.",
@@ -15,29 +13,24 @@ export const getSheetsData = async () => {
   ];
 
   try {
-    const res = await fetch(URL);
+    const res = await fetch(PUB_URL);
     
-    if (!res.ok) {
-      console.error("Sheets inaccessible (404/Private). Utilisation du secours.");
-      return fallbackData;
-    }
+    if (!res.ok) throw new Error("Impossible de lire le lien de publication");
 
-    const text = await res.text();
-    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S\w]+)\)/);
+    const csvText = await res.text();
     
-    if (match && match[1]) {
-      const json = JSON.parse(match[1]);
-      const data = json.table.rows
-        .map(row => (row.c && row.c[0] ? row.c[0].v : null))
-        .filter(v => v !== null && v !== "");
-      
-      return data.length > 0 ? data : fallbackData;
-    }
+    // On transforme le CSV en tableau (on sépare par lignes)
+    // On enlève la première ligne si c'est un titre (header)
+    const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== "");
     
-    return fallbackData;
+    // Si tu as un titre en haut de ta colonne, on l'enlève avec .slice(1)
+    // Sinon, utilise juste lines
+    const data = lines.length > 1 ? lines.slice(1) : lines;
+
+    return data.length > 0 ? data : fallbackData;
 
   } catch (error) {
-    console.error("Erreur critique DataService:", error);
-    return fallbackData; // Garantit qu'on renvoie TOUJOURS un tableau (évite l'erreur iterable)
+    console.error("Erreur DataService (Lien Public):", error);
+    return fallbackData; // Retourne toujours un tableau pour éviter l'erreur "not iterable"
   }
 };
