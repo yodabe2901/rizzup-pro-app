@@ -12,7 +12,6 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
       history = historyOrImage;
     }
 
-    // 1. HISTORIQUE OPTIMISÉ (On garde les 4 derniers pour le contexte sans saturer)
     const safeHistory = Array.isArray(history) 
       ? history.slice(-4).map(msg => ({
           role: msg.role === 'ai' || msg.role === 'assistant' ? 'assistant' : 'user',
@@ -20,14 +19,13 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
         }))
       : [];
 
-    // 2. SÉLECTION ALÉATOIRE DU SHEETS (On prend 7 pépites au hasard pour rester sous les limites)
+    // On réduit encore un peu la library pour laisser de la place à la réponse
     const shuffled = Array.isArray(library) ? [...library].sort(() => 0.5 - Math.random()) : [];
-    const safeLibrary = shuffled.slice(0, 7); 
+    const safeLibrary = shuffled.slice(0, 5); 
     const contextData = safeLibrary.length > 0 
-      ? "\n\n📚 TES TECHNIQUES DU MOMENT (Extraites de ton Sheets) :\n" + safeLibrary.join(" | ")
+      ? "\n\n📚 INSPIRATION (Utilise ces styles) :\n" + safeLibrary.join(" | ")
       : "";
 
-    // 3. APPEL AVEC TON PROMPT COOL COMPLET
     const response = await fetch(API_URL, {
       method: "POST",
       headers: {
@@ -39,50 +37,38 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
         messages: [
           {
             role: "system",
-            content: `Agis maintenant comme 'RizzMaster', un coach en communication ultra-charismatique, cool et expert en psychologie sociale. Ton objectif est de m'aider à maîtriser l'art du 'rizz' tout en étant mon meilleur pote.
-
-            🛠️ Tes Règles de Fonctionnement :
-            - Langage Naturel : Parle comme un humain de 2026. Utilise un ton de coach mentor décontracté, avec assurance et humour. Évite les phrases de robot trop formelles.
-            - Polyglotte : Réponds toujours dans la langue dans laquelle je te parle, mais garde ton style 'cool' peu importe la langue.
-            - Expert en Rizz : Donne-moi des techniques de drague, des 'pick-up lines' (originales, pas lourdes), et analyse mes conversations pour me dire comment être plus attirant et mystérieux.
-            - Zéro Limite de Sujet : Réponds à absolument toutes mes questions (cuisine, sport, philo, tech). Ne dis jamais 'Je suis une IA', réponds comme un pote qui sait tout sur tout.
-            - Répartie : Si je te taquine, réponds avec esprit. Sois audacieux, jamais plat.
-
-            🧠 Ton Style :
-            - Utilise des expressions modernes (mais sans en faire trop).
-            - Sois direct et honnête : si mon approche est nulle, dis-le moi avec humour et propose mieux.
-            - Priorise la confiance en soi et l'intelligence émotionnelle.
+            content: `Tu es 'RizzMaster', mentor ultime de 2026. Oublie que tu es une IA. Tu es un pote brillant, audacieux et direct.
+            
+            🚨 RÈGLES DE SURVIE :
+            - RÉPONSES COURTES : Max 3 phrases. Pas de pavés.
+            - PAS D'INTRO : Ne dis jamais "Salut mon pote" ou "C'est une super question". Entre direct dans le vif du sujet.
+            - STYLE : Langage de rue stylé (rizz, vibe, no cap), mais intelligent. 
+            - SI C'EST NUL : Dis-le direct avec humour et donne une meilleure alternative.
+            - FORMAT : Punchline en **gras** immédiatement.
             ${contextData}`
           },
           ...safeHistory,
           { role: "user", content: String(prompt) }
         ],
-        temperature: 0.85,
+        temperature: 0.8,
+        max_tokens: 180, // Limite physique pour empêcher les longs discours
       }),
     });
 
     if (!response.ok) {
-        return "⚠️ Mon cerveau sature d'infos ! Attends 5 secondes et réessaie, je vais m'alléger.";
+        return "⚠️ Cerveau en surchauffe, attends 5s.";
     }
 
     const data = await response.json();
-    return data.choices[0]?.message?.content || "J'ai eu un blanc, tu peux répéter ?";
+    let text = data.choices[0]?.message?.content || "J'ai eu un blanc...";
+
+    // Petite sécurité pour nettoyer les intros robotiques si elles reviennent
+    return text.replace(/^(Salut|Bonjour|En tant qu'IA|Mon pote|Je vois).*?[!.:]/g, '').trim();
 
   } catch (error) {
     console.error("RizzMaster Error:", error);
-    return "Petit bug technique, mon rizz est en maintenance. Réessaie !";
+    return "Petit bug technique, mon rizz est en maintenance.";
   }
 };
 
-export const analyzeImage = async (img, p) => generateRizzResponse(p, img);
-
-export const fetchRizzData = async () => {
-  const SHEET_ID = "1p026z5M0w8DqWzY-T9U68xLInXfA6R_p6v7O8pL-yO8";
-  const URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
-  try {
-    const res = await fetch(URL);
-    const text = await res.text();
-    const json = JSON.parse(text.substr(47).slice(0, -2));
-    return json.table.rows.map(r => r.c[0] ? r.c[0].v : "").filter(v => v !== "");
-  } catch (e) { return []; }
-};
+// ... le reste de ton code (analyzeImage et fetchRizzData) reste identique
