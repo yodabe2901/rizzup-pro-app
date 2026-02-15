@@ -19,7 +19,6 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
         }))
       : [];
 
-    // On réduit encore un peu la library pour laisser de la place à la réponse
     const shuffled = Array.isArray(library) ? [...library].sort(() => 0.5 - Math.random()) : [];
     const safeLibrary = shuffled.slice(0, 5); 
     const contextData = safeLibrary.length > 0 
@@ -45,15 +44,15 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
 - SI L'USER SE PLAINT : Recadre-le direct avec humour.
 - FORMAT : Une punchline **en gras** d'abord, une explication tactique ensuite.
 
-Exemple pour "Je suis moche" :
-"**Le charisme bat la génétique 10-0.** Si t'as pas la gueule, travaille le style, la voix et l'audace. La confiance, c'est ça le vrai hack."
+Exemple : "**Le charisme bat la génétique 10-0.** Si t'as pas la gueule, travaille le style et l'audace."
 
 ${contextData}`
+          }, // <--- La virgule et l'accolade manquaient ici !
           ...safeHistory,
           { role: "user", content: String(prompt) }
         ],
         temperature: 0.8,
-        max_tokens: 180, // Limite physique pour empêcher les longs discours
+        max_tokens: 180,
       }),
     });
 
@@ -64,7 +63,6 @@ ${contextData}`
     const data = await response.json();
     let text = data.choices[0]?.message?.content || "J'ai eu un blanc...";
 
-    // Petite sécurité pour nettoyer les intros robotiques si elles reviennent
     return text.replace(/^(Salut|Bonjour|En tant qu'IA|Mon pote|Je vois).*?[!.:]/g, '').trim();
 
   } catch (error) {
@@ -72,5 +70,3 @@ ${contextData}`
     return "Petit bug technique, mon rizz est en maintenance.";
   }
 };
-
-// ... le reste de ton code (analyzeImage et fetchRizzData) reste identique
