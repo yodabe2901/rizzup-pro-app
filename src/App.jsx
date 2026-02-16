@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getSheetsData as fetchRizzData } from './services/dataService';
 import { 
   LayoutDashboard, 
@@ -7,18 +7,16 @@ import {
   Zap, 
   Search as SearchIcon, 
   User,
-  Settings,
   Sparkles,
-  Shield,
-  Layers,
-  ZapOff,
-  Bell,
+  AlertCircle,
   CheckCircle2,
-  AlertTriangle
+  RefreshCw,
+  Bell,
+  Settings
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValue, useTransform } from 'framer-motion';
 
-// --- COMPOSANTS INTERNES ---
+// --- IMPORTS COMPOSANTS ---
 import Home from './components/Home';
 import Chat from './components/Chat';
 import Search from './components/Search';
@@ -27,30 +25,30 @@ import InstantRizz from './components/InstantRizz';
 import Favorites from './pages/Favorites';
 import Onboarding from './components/Onboarding';
 
-/**
- * CONFIGURATION DU SYSTÈME
- */
+// --- CONFIGURATION SYSTÈME ---
 const TABS = ['home', 'search', 'chat', 'profile'];
-const ANIM_DURATION = 0.4;
+const GESTURE_THRESHOLD = 45; // Sensibilité du swipe (plus bas = plus sensible)
 
+/**
+ * CORE APPLICATION : RIZZ V2.8 (BUILD APK OPTIMIZED)
+ * Focus : Navigation au pouce, Latence 0, Symétrie totale
+ */
 export default function App() {
   // --- ÉTATS DE NAVIGATION ---
   const [activeTab, setActiveTab] = useState('home');
   const [direction, setDirection] = useState(0); 
-
-  // --- ÉTATS DE DONNÉES ---
+  const [isInstantOpen, setIsInstantOpen] = useState(false);
+  
+  // --- ÉTATS DES DONNÉES ---
   const [rizzLibrary, setRizzLibrary] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [isReady, setIsReady] = useState(false);
-  const [apiError, setApiError] = useState(false);
+  const [error, setError] = useState(null);
 
-  // --- ÉTATS INTERFACE ---
-  const [isInstantOpen, setIsInstantOpen] = useState(false);
+  // --- ÉTATS D'INTERFACE (UI) ---
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [notification, setNotification] = useState({ show: false, msg: "" });
-
-  // --- OPTION : BOUTON ZAP FLOTTANT ---
-  const [showFloatingZap, setShowFloatingZap] = useState(() => {
+  const [notif, setNotif] = useState({ show: false, msg: "" });
+  const [showZap, setShowZap] = useState(() => {
     try {
       const saved = localStorage.getItem('rizz_zap_visible');
       return saved !== null ? JSON.parse(saved) : true;
@@ -58,276 +56,293 @@ export default function App() {
   });
 
   /**
-   * INITIALISATION CRITIQUE
-   * Charge les données et gère les délais pour éviter l'écran noir
+   * INITIALISATION ASYNCHRONE
+   * Chargement des données Sheets et synchronisation locale
    */
   useEffect(() => {
     const bootstrap = async () => {
-      console.log("🚀 Rizz OS: Initializing...");
+      console.log("RIZZ_OS: Initializing Build...");
       try {
-        // 1. Favoris & Cache
-        const cached = localStorage.getItem('rizz_favs');
-        if (cached) setFavorites(JSON.parse(cached));
+        // 1. Check Onboarding
+        if (!localStorage.getItem('rizz_onboarded')) setShowOnboarding(true);
 
-        // 2. Onboarding check
-        if (!localStorage.getItem('rizz_onboarded')) {
-          setShowOnboarding(true);
-        }
+        // 2. Load Favs
+        const cachedFavs = localStorage.getItem('rizz_favs');
+        if (cachedFavs) setFavorites(JSON.parse(cachedFavs));
 
-        // 3. API Fetch
+        // 3. Fetch Data from Google Sheets
         const data = await fetchRizzData();
         if (data && Array.isArray(data)) {
           setRizzLibrary(data);
         } else {
-          setApiError(true);
+          console.warn("RIZZ_OS: Data empty, using fallback");
         }
       } catch (err) {
-        console.error("❌ Rizz OS Error:", err);
-        setApiError(true);
+        console.error("RIZZ_OS: Critical Failure", err);
+        setError("Connection error");
       } finally {
-        // Temps de sécurité pour laisser React monter les composants
-        setTimeout(() => {
-          setIsReady(true);
-          console.log("✅ Rizz OS: Interface Ready");
-        }, 1200);
+        // Delay artificiel pour stabiliser l'APK au lancement
+        setTimeout(() => setIsReady(true), 1100);
       }
     };
     bootstrap();
   }, []);
 
   /**
-   * NAVIGATION PAR BALAYAGE (SWIPE)
+   * LOGIQUE DE NAVIGATION PAR GESTE (SWIPE)
+   * Calibrée pour mobile (Velocity + Offset)
    */
-  const handleSwipe = useCallback((swipeDir) => {
+  const handleGesture = useCallback((_, info) => {
     const currentIndex = TABS.indexOf(activeTab);
-    if (swipeDir === 'left' && currentIndex < TABS.length - 1) {
+    const { x } = info.offset;
+    const { x: vx } = info.velocity;
+
+    // Swipe vers la gauche (Tab suivante)
+    if ((x < -GESTURE_THRESHOLD || vx < -300) && currentIndex < TABS.length - 1) {
       setDirection(1);
       setActiveTab(TABS[currentIndex + 1]);
-    } else if (swipeDir === 'right' && currentIndex > 0) {
+    } 
+    // Swipe vers la droite (Tab précédente)
+    else if ((x > GESTURE_THRESHOLD || vx > 300) && currentIndex > 0) {
       setDirection(-1);
       setActiveTab(TABS[currentIndex - 1]);
     }
   }, [activeTab]);
 
   /**
-   * LOGIQUE DES FAVORIS
+   * ACTIONS GLOBALES
    */
-  const handleFavorite = (text) => {
+  const handleToggleFavorite = (text) => {
     setFavorites(prev => {
-      const isFav = prev.includes(text);
-      const nextFavs = isFav ? prev.filter(f => f !== text) : [...prev, text];
-      localStorage.setItem('rizz_favs', JSON.stringify(nextFavs));
+      const exists = prev.includes(text);
+      const updated = exists ? prev.filter(f => f !== text) : [...prev, text];
+      localStorage.setItem('rizz_favs', JSON.stringify(updated));
       
-      // Petit feedback visuel
-      setNotification({ show: true, msg: isFav ? "Removed" : "Saved!" });
-      setTimeout(() => setNotification({ show: false, msg: "" }), 2000);
-      
-      return nextFavs;
+      setNotif({ show: true, msg: exists ? "Removed" : "Added to Favs" });
+      setTimeout(() => setNotif({ show: false, msg: "" }), 1800);
+      return updated;
     });
   };
 
-  /**
-   * TOGGLE DU BOUTON FLOTTANT
-   */
-  const toggleZapDisplay = () => {
-    const nextState = !showFloatingZap;
-    setShowFloatingZap(nextState);
-    localStorage.setItem('rizz_zap_visible', JSON.stringify(nextState));
+  const toggleZapBtn = () => {
+    const next = !showZap;
+    setShowZap(next);
+    localStorage.setItem('rizz_zap_visible', JSON.stringify(next));
   };
 
   /**
-   * SPLASH SCREEN (Affiché tant que isReady est faux)
+   * RENDER : SPLASH SCREEN
    */
   if (!isReady) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[999]">
         <motion.div 
-          animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-          transition={{ repeat: Infinity, duration: 1.5 }}
+          animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+          transition={{ repeat: Infinity, duration: 2 }}
           className="text-blue-600 mb-6"
         >
-          <Zap size={60} fill="currentColor" />
+          <Zap size={56} fill="currentColor" />
         </motion.div>
-        <p className="text-white text-[10px] font-black tracking-[0.8em] uppercase italic animate-pulse">
-          Rizz OS Loading
-        </p>
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-white text-[10px] font-black tracking-[0.6em] uppercase italic">Rizz OS v2.8</span>
+          <div className="w-24 h-[1px] bg-zinc-800 relative overflow-hidden">
+            <motion.div 
+              animate={{ left: ['-100%', '100%'] }}
+              transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+              className="absolute w-1/2 h-full bg-blue-500"
+            />
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-black min-h-screen text-white font-sans overflow-hidden select-none">
+    <div className="bg-black min-h-screen text-white font-sans overflow-hidden select-none touch-none">
       
-      {/* --- NOTIFICATIONS --- */}
+      {/* --- LAYER: NOTIFICATIONS --- */}
       <AnimatePresence>
-        {notification.show && (
+        {notif.show && (
           <motion.div 
-            initial={{ opacity: 0, y: -50 }}
-            animate={{ opacity: 1, y: 30 }}
-            exit={{ opacity: 0, y: -50 }}
-            className="fixed top-0 left-1/2 -translate-x-1/2 z-[500] bg-white/10 backdrop-blur-md border border-white/20 px-6 py-2 rounded-full flex items-center gap-2 shadow-2xl"
+            initial={{ y: -60, opacity: 0 }}
+            animate={{ y: 20, opacity: 1 }}
+            exit={{ y: -60, opacity: 0 }}
+            className="fixed top-0 left-1/2 -translate-x-1/2 z-[500] px-6 py-2 bg-zinc-900 border border-white/10 rounded-full flex items-center gap-3 shadow-2xl"
           >
-            <CheckCircle2 size={14} className="text-blue-400" />
-            <span className="text-[10px] font-bold uppercase">{notification.msg}</span>
+            <CheckCircle2 size={14} className="text-blue-500" />
+            <span className="text-[10px] font-black uppercase italic tracking-tighter">{notif.msg}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* --- ONBOARDING --- */}
+      {/* --- LAYER: ONBOARDING --- */}
       <AnimatePresence>
         {showOnboarding && (
-          <Onboarding key="onboard" onComplete={() => {
+          <Onboarding onComplete={() => {
             localStorage.setItem('rizz_onboarded', 'true');
             setShowOnboarding(false);
           }} />
         )}
       </AnimatePresence>
 
-      {/* --- BOUTON ZAP FLOTTANT (DESIGN PREMIUM) --- */}
+      {/* --- LAYER: BOUTON ZAP FLOTTANT (DRAGGABLE) --- */}
       <AnimatePresence>
-        {showFloatingZap && (
+        {showZap && (
           <motion.div 
             drag
-            dragConstraints={{ top: -600, left: -180, right: 20, bottom: 0 }}
+            dragConstraints={{ top: -500, left: -160, right: 20, bottom: 0 }}
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            whileTap={{ scale: 0.8 }}
-            className="fixed bottom-36 right-6 z-[120]"
+            whileTap={{ scale: 0.85 }}
+            className="fixed bottom-24 right-6 z-[120]"
           >
             <button 
               onClick={() => setIsInstantOpen(true)}
-              className="bg-gradient-to-tr from-blue-700 to-blue-500 p-5 rounded-[26px] shadow-[0_15px_45px_rgba(37,99,235,0.4)] border border-white/10 group"
+              className="bg-blue-600 p-5 rounded-[24px] shadow-[0_15px_40px_rgba(37,99,235,0.4)] border border-blue-400/30"
             >
-              <Zap size={30} fill="white" className="group-active:scale-110 transition-transform" />
-              <motion.div 
-                animate={{ scale: [1, 1.4, 1], opacity: [0.2, 0, 0.2] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="absolute inset-0 bg-white rounded-[26px]"
-              />
+              <Zap size={28} fill="white" />
+              <div className="absolute -top-1 -right-1">
+                <Sparkles size={14} className="text-blue-200 animate-pulse" />
+              </div>
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* --- CONTENEUR PRINCIPAL --- */}
-      <main className="max-w-md mx-auto h-screen relative overflow-hidden bg-black shadow-2xl">
+      {/* --- CONTENEUR DE PAGES PRINCIPAL --- */}
+      <main className="max-w-md mx-auto h-screen relative bg-black shadow-inner">
         
-        {/* SYSTÈME DE GESTES ET ANIMATIONS DE PAGES */}
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div 
             key={activeTab}
-            className="h-full w-full outline-none"
+            className="h-full w-full touch-pan-y"
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.4}
-            onDragEnd={(e, { offset }) => {
-              if (offset.x < -100) handleSwipe('left');
-              if (offset.x > 100) handleSwipe('right');
-            }}
-            initial={{ opacity: 0, x: direction > 0 ? 30 : -30 }}
+            onDragEnd={handleGesture}
+            initial={{ opacity: 0, x: direction > 0 ? 40 : -40 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction > 0 ? -30 : 30 }}
-            transition={{ type: "spring", stiffness: 400, damping: 35 }}
+            exit={{ opacity: 0, x: direction > 0 ? -40 : 40 }}
+            transition={{ type: "spring", stiffness: 450, damping: 35 }}
           >
-            <div className="h-full w-full pb-32">
-              {activeTab === 'home' && <Home library={rizzLibrary} setTab={setActiveTab} />}
-              {activeTab === 'search' && <Search library={rizzLibrary} />}
-              {activeTab === 'chat' && <Chat onFav={handleFavorite} favorites={favorites} library={rizzLibrary} />}
+            {/* INJECTION DES COMPOSANTS */}
+            <div className="h-full w-full pb-20 overflow-y-auto">
+              {activeTab === 'home' && (
+                <Home library={rizzLibrary} setTab={setActiveTab} />
+              )}
+              {activeTab === 'search' && (
+                <Search library={rizzLibrary} />
+              )}
+              {activeTab === 'chat' && (
+                <Chat 
+                  onFav={handleToggleFavorite} 
+                  favorites={favorites} 
+                  library={rizzLibrary} 
+                />
+              )}
               {activeTab === 'profile' && (
                 <Profile 
                   favorites={favorites} 
                   library={rizzLibrary} 
                   setTab={setActiveTab}
-                  zapVisible={showFloatingZap}
-                  onToggleZap={toggleZapDisplay}
+                  zapVisible={showZap}
+                  onToggleZap={toggleZapBtn}
                 />
               )}
-              {activeTab === 'favorites' && <Favorites favorites={favorites} onFav={handleFavorite} />}
+              {activeTab === 'favorites' && (
+                <Favorites favorites={favorites} onFav={handleToggleFavorite} />
+              )}
             </div>
           </motion.div>
         </AnimatePresence>
 
-        {/* MODALE INSTANTANÉE */}
-        <InstantRizz isOpen={isInstantOpen} onClose={() => setIsInstantOpen(false)} library={rizzLibrary} />
+        {/* MODALE INSTANT ZAP */}
+        <InstantRizz 
+          isOpen={isInstantOpen} 
+          onClose={() => setIsInstantOpen(false)} 
+          library={rizzLibrary} 
+        />
       </main>
 
-      {/* --- BARRE DE NAVIGATION (ESPACEMENT ÉGAL PARFAIT) --- */}
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-black/95 backdrop-blur-3xl border-t border-white/5 z-[100] pb-12 pt-4 px-2">
-        <div className="flex w-full items-center justify-around">
+      {/* --- NAV BAR ABAISSÉE (4 COLONNES PARFAITES) --- */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-2xl border-t border-white/5 z-[100] pb-6 pt-3 px-2">
+        <div className="max-w-md mx-auto flex w-full items-center justify-around">
           
           <NavBtn 
             active={activeTab === 'home'} 
             onClick={() => { setDirection(-1); setActiveTab('home'); }} 
-            icon={<LayoutDashboard size={24}/>} 
+            icon={<LayoutDashboard size={22}/>} 
             label="Feed"
           />
           
           <NavBtn 
             active={activeTab === 'search'} 
             onClick={() => { setDirection(activeTab === 'home' ? 1 : -1); setActiveTab('search'); }} 
-            icon={<SearchIcon size={24}/>} 
+            icon={<SearchIcon size={22}/>} 
             label="Find"
           />
           
           <NavBtn 
             active={activeTab === 'chat'} 
             onClick={() => { setDirection(1); setActiveTab('chat'); }} 
-            icon={<MessageSquare size={24}/>} 
+            icon={<MessageSquare size={22}/>} 
             label="AI Chat"
           />
           
           <NavBtn 
             active={activeTab === 'profile' || activeTab === 'favorites'} 
             onClick={() => { setDirection(1); setActiveTab('profile'); }} 
-            icon={<User size={24}/>} 
+            icon={<User size={22}/>} 
             label="You"
           />
           
         </div>
       </nav>
 
-      {/* ALERTES ERREUR API */}
-      {apiError && (
-        <div className="fixed bottom-28 left-0 w-full flex justify-center pointer-events-none opacity-40">
-          <div className="flex items-center gap-2 text-[8px] font-black uppercase text-zinc-500">
-            <AlertTriangle size={10} />
-            Offline Mode Active
+      {/* FEEDBACK ERREUR API */}
+      {error && (
+        <div className="fixed bottom-24 left-0 w-full flex justify-center pointer-events-none opacity-40">
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 rounded-full">
+            <AlertCircle size={10} className="text-red-500" />
+            <span className="text-[8px] font-black uppercase text-red-500 tracking-tighter">{error}</span>
           </div>
         </div>
       )}
+
     </div>
   );
 }
 
 /**
  * COMPOSANT BOUTON DE NAVIGATION
- * Divise l'espace en 4 parties égales (flex-1)
+ * Divise l'espace en 4 via flex-1. 
+ * Les icônes sont positionnées plus bas pour l'accessibilité APK.
  */
 function NavBtn({ active, onClick, icon, label }) {
   return (
     <button 
       onClick={onClick} 
-      className="flex-1 flex flex-col items-center justify-center py-2 relative"
+      className="flex-1 flex flex-col items-center justify-center py-1 transition-all duration-300 relative"
     >
-      <div className={`transition-all duration-300 ${active ? 'text-blue-500 scale-110' : 'text-zinc-600 hover:text-zinc-400'}`}>
+      <div className={`transition-all duration-300 ${active ? 'text-blue-500 scale-110' : 'text-zinc-600'}`}>
         {icon}
         {active && (
           <motion.div 
-            layoutId="nav-glow-indicator"
-            className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full"
+            layoutId="nav-glow"
+            className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full"
           />
         )}
       </div>
       
-      <span className={`text-[8px] font-black uppercase mt-1.5 tracking-widest transition-opacity duration-300 ${active ? 'text-blue-500 opacity-100' : 'opacity-0'}`}>
+      <span className={`text-[8px] font-black uppercase tracking-tighter mt-1 transition-all duration-300 ${active ? 'text-blue-500 opacity-100 translate-y-0' : 'text-zinc-700 opacity-0 translate-y-2'}`}>
         {label}
       </span>
 
       {active && (
         <motion.div 
-          layoutId="active-nav-dot"
-          className="w-1 h-1 bg-blue-500 rounded-full mt-1"
+          layoutId="nav-indicator"
+          className="w-1 h-1 bg-blue-500 rounded-full mt-0.5"
           transition={{ type: "spring", stiffness: 500, damping: 30 }}
         />
       )}
