@@ -3,22 +3,20 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider, OAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyD9IrqHWmObU7cQlDcv8TER5rncAuoY4UA", // Ta vraie clé ici
-  authDomain: "rizzup-pro-app.firebaseapp.com",
-  projectId: "rizzup-pro-app",
-  storageBucket: "rizzup-pro-app.appspot.com",
-  messagingSenderId: "771251000103",
-  appId: "1:771251000103:web:..."
+  apiKey: "AIzaSyDVLGCKKMDxOX9ooSYlEjVFCUpfXjSTAqQ",
+  authDomain: "rizzup-cfbf6.firebaseapp.com",
+  projectId: "rizzup-cfbf6",
+  storageBucket: "rizzup-cfbf6.firebasestorage.app",
+  messagingSenderId: "876645582428",
+  appId: "1:876645582428:web:b05470ed91387b2ddc0899",
+  measurementId: "G-P1BP4N0S8H"
 };
 
-// Initialisation de Firebase
+// Initialisation
 const app = initializeApp(firebaseConfig);
 
-// Exports des modules
+// Exports pour ton application
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const appleProvider = new OAuthProvider('apple.com');
-
-// Configuration optionnelle pour Google (évite certains bugs de popup)
-googleProvider.setCustomParameters({ prompt: 'select_account' });
