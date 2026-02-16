@@ -27,7 +27,7 @@ import Search from './components/Search';
 import Profile from './components/Profile'; 
 import InstantRizz from './components/InstantRizz';
 import Favorites from './pages/Favorites';
-import Settings from './pages/Settings'; 
+import Settings from './components/Settings';
 import Onboarding from './components/Onboarding';
 
 // --- CONFIGURATION SYSTÈME ---
