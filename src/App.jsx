@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { db } from './firebase'; 
-import { doc, setDoc, onSnapshot, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { db, auth } from './firebase'; 
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { 
+  doc, 
+  setDoc, 
+  onSnapshot, 
+  getDoc, 
+  updateDoc, 
+  arrayUnion, 
+  arrayRemove,
+  serverTimestamp 
+} from "firebase/firestore";
 import { getSheetsData as fetchRizzData } from './services/dataService';
 import { 
   LayoutDashboard, 
@@ -16,11 +26,14 @@ import {
   Settings as SettingsIcon,
   Crown,
   Bell,
-  Cpu
+  Cpu,
+  LogOut,
+  Fingerprint
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-// --- IMPORTS COMPOSANTS ---
+// --- CORE COMPONENTS ---
+import Auth from './components/Auth';
 import Home from './components/Home';
 import Chat from './components/Chat';
 import Search from './components/Search';
@@ -30,342 +43,296 @@ import Favorites from './pages/Favorites';
 import Settings from './components/Settings';
 import Onboarding from './components/Onboarding';
 
-// --- CONFIGURATION SYSTÈME ---
+// --- ENGINE CONFIGURATION ---
 const MAIN_TABS = ['home', 'search', 'chat', 'profile'];
-const SESSION_ID = "rizz_user_001";
-const GESTURE_SWIPE_LIMIT = 50;
+const GESTURE_SWIPE_LIMIT = 60;
+const VERSION = "3.5.2-PRO";
 
 /**
- * RIZZ OS v3.5.2 - CORE CORE ARCHITECTURE
- * Optimisé pour déploiement APK / Mobile natif
+ * RIZZ OS - TITAN ENGINE
+ * Full Cloud Synchronization & Auth Guard System
  */
 export default function App() {
-  // --- ÉTATS DE NAVIGATION ---
+  // --- AUTHENTICATION STATE ---
+  const [user, setUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [userData, setUserData] = useState(null);
+
+  // --- NAVIGATION STATE ---
   const [activeTab, setActiveTab] = useState('home');
   const [direction, setDirection] = useState(0); 
   const [isInstantOpen, setIsInstantOpen] = useState(false);
-  const [history, setHistory] = useState(['home']);
   
-  // --- ÉTATS DES DONNÉES (CLOUD & LOCAL) ---
+  // --- DATA PIPELINE ---
   const [rizzLibrary, setRizzLibrary] = useState([]);
   const [favorites, setFavorites] = useState([]);
-  const [isReady, setIsReady] = useState(false);
-  const [error, setError] = useState(null);
+  const [isDataReady, setIsDataReady] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // --- ÉTATS UI & PRÉFÉRENCES ---
+  // --- UI & FEEDBACK ---
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [notif, setNotif] = useState({ show: false, msg: "", type: "success" });
-  const [appVersion] = useState("3.5.2");
-  const [showZap, setShowZap] = useState(() => {
-    try {
-      const saved = localStorage.getItem('rizz_zap_visible');
-      return saved !== null ? JSON.parse(saved) : true;
-    } catch { return true; }
-  });
+  const [bootLog, setBootLog] = useState("Initializing Core...");
 
-  // --- 1. MONITORING RÉSEAU ---
+  // --- 1. NETWORK INTELLIGENCE ---
   useEffect(() => {
-    const handleStatus = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', handleStatus);
-    window.addEventListener('offline', handleStatus);
+    const updateStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
     return () => {
-      window.removeEventListener('online', handleStatus);
-      window.removeEventListener('offline', handleStatus);
+      window.removeEventListener('online', updateStatus);
+      window.removeEventListener('offline', updateStatus);
     };
   }, []);
 
-  // --- 2. INITIALISATION ET SYNC FIRESTORE ---
+  // --- 2. AUTHENTICATION WATCHER ---
   useEffect(() => {
-    const bootstrapApp = async () => {
-      console.log(`%c RIZZ OS v${appVersion} BOOTING... `, 'background: #2563eb; color: #fff; font-weight: bold;');
-      
+    setBootLog("Verifying Identity...");
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsAuthLoading(false);
+      if (!currentUser) {
+        setIsDataReady(false);
+        setUserData(null);
+      }
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  // --- 3. DATA & CLOUD SYNC ENGINE ---
+  useEffect(() => {
+    if (!user) return;
+
+    const initializeUserSession = async () => {
+      setBootLog("Establishing Secure Cloud Link...");
       try {
-        // Check Onboarding status
-        if (!localStorage.getItem('rizz_onboarded')) setShowOnboarding(true);
+        // A. Load Content Library (Google Sheets)
+        const libraryData = await fetchRizzData();
+        if (libraryData) setRizzLibrary(libraryData);
 
-        // Fetch Content Library
-        const data = await fetchRizzData();
-        if (data) setRizzLibrary(data);
-
-        // Real-time Cloud Sync
-        const userDocRef = doc(db, "users", SESSION_ID);
-        const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
+        // B. Setup Real-time Firestore Sync
+        const userDocRef = doc(db, "users", user.uid);
+        
+        const unsubscribeData = onSnapshot(userDocRef, (snapshot) => {
           if (snapshot.exists()) {
-            const cloudData = snapshot.data();
-            setFavorites(cloudData.favs || []);
-            // Sync local cache
-            localStorage.setItem('rizz_favs', JSON.stringify(cloudData.favs || []));
+            const data = snapshot.data();
+            setUserData(data);
+            setFavorites(data.favs || []);
+            setBootLog("Neural Map Synced.");
           } else {
-            // Initialiser le profil si nouveau
+            // New User Initialization
+            setBootLog("Creating Neural Profile...");
             setDoc(userDocRef, { 
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName || "Rizz Operative",
+              photoURL: user.photoURL || null,
               favs: [], 
-              createdAt: new Date(),
               level: 1,
-              xp: 0
+              xp: 0,
+              createdAt: serverTimestamp(),
+              lastLogin: serverTimestamp()
             });
           }
-        }, (err) => {
-          console.error("Firebase Sync Error:", err);
-          setError("Cloud Sync Limited");
         });
 
-        return () => unsubscribe();
-      } catch (err) {
-        setError("Offline Mode Active");
-      } finally {
-        // Animation Splash Screen pour feeling Premium
-        setTimeout(() => setIsReady(true), 2000);
+        // C. Onboarding Check
+        if (!localStorage.getItem('rizz_onboarded')) setShowOnboarding(true);
+
+        // Finalize Boot
+        setTimeout(() => setIsDataReady(true), 2000);
+        return () => unsubscribeData();
+
+      } catch (error) {
+        console.error("Critical Engine Failure:", error);
+        setBootLog("Sync Error. Running Local.");
+        setTimeout(() => setIsDataReady(true), 1500);
       }
     };
-    bootstrapApp();
-  }, [appVersion]);
 
-  // --- 3. NAVIGATION GESTURE (SWIPE) ---
-  const handleSwipe = useCallback((_, info) => {
-    // Désactiver le swipe sur les pages de profondeur (Settings/Favorites)
+    initializeUserSession();
+  }, [user]);
+
+  // --- 4. GESTURE NAVIGATION CONTROL ---
+  const handleNavigationGesture = useCallback((_, info) => {
     if (!MAIN_TABS.includes(activeTab)) return;
 
     const currentIndex = MAIN_TABS.indexOf(activeTab);
-    const { x } = info.offset;
-    const { x: velocityX } = info.velocity;
+    const { x: offset } = info.offset;
+    const { x: velocity } = info.velocity;
 
-    if ((x < -GESTURE_SWIPE_LIMIT || velocityX < -300) && currentIndex < MAIN_TABS.length - 1) {
+    if ((offset < -GESTURE_SWIPE_LIMIT || velocity < -400) && currentIndex < MAIN_TABS.length - 1) {
       setDirection(1);
       setActiveTab(MAIN_TABS[currentIndex + 1]);
-    } else if ((x > GESTURE_SWIPE_LIMIT || velocityX > 300) && currentIndex > 0) {
+    } else if ((offset > GESTURE_SWIPE_LIMIT || velocity > 400) && currentIndex > 0) {
       setDirection(-1);
       setActiveTab(MAIN_TABS[currentIndex - 1]);
     }
   }, [activeTab]);
 
-  // --- 4. GESTIONNAIRE DE FAVORIS ---
-  const handleToggleFavorite = async (text) => {
-    const exists = favorites.includes(text);
+  // --- 5. FAVORITES SYSTEM (OPTIMISTIC UI) ---
+  const toggleFavorite = async (text) => {
+    if (!user) return;
     
-    // UI Optimiste : Update local immédiat
-    const updated = exists ? favorites.filter(f => f !== text) : [...favorites, text];
-    setFavorites(updated);
-
-    // Feedback Notif
-    setNotif({ 
-      show: true, 
-      msg: exists ? "Removed from Favorites" : "Saved to Cloud", 
-      type: "success" 
-    });
+    const isFav = favorites.includes(text);
+    const newFavs = isFav ? favorites.filter(f => f !== text) : [...favorites, text];
+    
+    // Step 1: Instant Local Update
+    setFavorites(newFavs);
+    setNotif({ show: true, msg: isFav ? "Memory Purged" : "Neural Link Saved" });
     setTimeout(() => setNotif(p => ({ ...p, show: false })), 2000);
 
-    // Sync Firestore
+    // Step 2: Cloud Sync
     try {
-      const userDocRef = doc(db, "users", SESSION_ID);
-      await updateDoc(userDocRef, {
-        favs: exists ? arrayRemove(text) : arrayUnion(text)
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        favs: isFav ? arrayRemove(text) : arrayUnion(text)
       });
-    } catch (e) {
-      console.warn("Cloud update failed, keeping local version.");
+    } catch (err) {
+      console.error("Cloud Rejection:", err);
     }
   };
 
-  // --- RENDER : LOADING / SPLASH ---
-  if (!isReady) return <SplashScreen version={appVersion} />;
+  // --- 6. LOGOUT HANDLER ---
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setActiveTab('home');
+    } catch (e) { console.error("Logout failed", e); }
+  };
 
+  // --- RENDERING PIPELINE ---
+
+  // Phase A: Hardware/Auth Boot
+  if (isAuthLoading) return <SplashScreen version={VERSION} log="Hardware Boot..." />;
+
+  // Phase B: Unauthorized Access
+  if (!user) return <Auth />;
+
+  // Phase C: Data Synchronization
+  if (!isDataReady) return <SplashScreen version={VERSION} log={bootLog} />;
+
+  // Phase D: Operational OS
   return (
     <div className="bg-black min-h-screen text-white font-sans overflow-hidden select-none touch-none">
       
-      {/* LAYER: SYSTEM NOTIFICATIONS */}
+      {/* HUD: SYSTEM NOTIFICATIONS */}
       <AnimatePresence>
         {notif.show && (
           <motion.div 
-            initial={{ y: -100, opacity: 0, scale: 0.5 }}
-            animate={{ y: 30, opacity: 1, scale: 1 }}
-            exit={{ y: -100, opacity: 0, scale: 0.5 }}
-            className="fixed top-0 left-1/2 -translate-x-1/2 z-[600] px-8 py-4 rounded-[25px] bg-zinc-900/90 border border-blue-500/20 backdrop-blur-3xl flex items-center gap-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+            initial={{ y: -100, opacity: 0 }} 
+            animate={{ y: 30, opacity: 1 }} 
+            exit={{ y: -100, opacity: 0 }}
+            className="fixed top-0 left-1/2 -translate-x-1/2 z-[999] px-6 py-3 rounded-full bg-blue-600/10 border border-blue-500/30 backdrop-blur-3xl flex items-center gap-3"
           >
-            <div className="bg-blue-600 p-1.5 rounded-full">
-              <ShieldCheck size={14} className="text-white" />
-            </div>
-            <span className="text-[11px] font-black uppercase italic tracking-[0.1em]">{notif.msg}</span>
+            <Fingerprint size={16} className="text-blue-400" />
+            <span className="text-[10px] font-black uppercase italic tracking-widest">{notif.msg}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* LAYER: NETWORK STATUS BAR */}
-      {!isOnline && (
-        <motion.div 
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="fixed top-4 right-4 z-[500] flex items-center gap-2 bg-red-600/10 border border-red-500/20 px-4 py-2 rounded-2xl backdrop-blur-md"
-        >
-          <WifiOff size={14} className="text-red-500" />
-          <span className="text-[9px] font-black uppercase text-red-500">Local Only</span>
-        </motion.div>
-      )}
-
-      {/* LAYER: FLOATING ACTION BUTTON (ZAP) */}
-      <AnimatePresence>
-        {showZap && !['settings', 'favorites'].includes(activeTab) && (
-          <motion.div 
-            initial={{ scale: 0, rotate: -90 }}
-            animate={{ scale: 1, rotate: 0 }}
-            exit={{ scale: 0, rotate: 90 }}
-            whileTap={{ scale: 0.9 }}
-            className="fixed bottom-36 right-8 z-[150]"
-          >
-            <button 
-              onClick={() => setIsInstantOpen(true)}
-              className="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-[30px] shadow-[0_20px_60px_rgba(37,99,235,0.4)] border border-white/20 active:shadow-none"
-            >
-              <Zap size={30} fill="white" />
-              <motion.div 
-                animate={{ opacity: [0, 0.5, 0], scale: [1, 1.4, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="absolute inset-0 bg-white rounded-[30px]"
-              />
-            </button>
-          </motion.div>
+      {/* HUD: STATUS INDICATORS */}
+      <div className="fixed top-6 left-6 z-[500] flex items-center gap-4">
+        {!isOnline && (
+          <div className="flex items-center gap-2 bg-red-600/20 px-3 py-1 rounded-full border border-red-600/30">
+            <WifiOff size={10} className="text-red-500" />
+            <span className="text-[8px] font-black uppercase text-red-500 tracking-tighter">Local Link Only</span>
+          </div>
         )}
-      </AnimatePresence>
+      </div>
 
-      {/* --- MAIN NAVIGATION VIEW --- */}
       <main className="max-w-md mx-auto h-screen relative bg-black">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div 
             key={activeTab}
             drag={MAIN_TABS.includes(activeTab) ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.2}
-            onDragEnd={handleSwipe}
-            initial={{ opacity: 0, x: direction > 0 ? 100 : -100 }}
+            onDragEnd={handleNavigationGesture}
+            initial={{ opacity: 0, x: direction > 0 ? 80 : -80 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction > 0 ? -100 : 100 }}
-            transition={{ type: "spring", stiffness: 350, damping: 35 }}
+            exit={{ opacity: 0, x: direction > 0 ? -80 : 80 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="h-full w-full"
           >
             <section className="h-full w-full pb-32 overflow-y-auto no-scrollbar">
-              {/* VUES PRINCIPALES */}
               {activeTab === 'home' && <Home library={rizzLibrary} setTab={setActiveTab} />}
               {activeTab === 'search' && <Search library={rizzLibrary} />}
-              {activeTab === 'chat' && <Chat onFav={handleToggleFavorite} favorites={favorites} library={rizzLibrary} />}
-              {activeTab === 'profile' && <Profile favorites={favorites} library={rizzLibrary} setTab={setActiveTab} />}
+              {activeTab === 'chat' && <Chat onFav={toggleFavorite} favorites={favorites} library={rizzLibrary} />}
+              {activeTab === 'profile' && <Profile user={user} userData={userData} favorites={favorites} library={rizzLibrary} setTab={setActiveTab} onLogout={handleLogout} />}
               
-              {/* VUES DE PROFONDEUR */}
-              {activeTab === 'favorites' && <Favorites favorites={favorites} onFav={handleToggleFavorite} />}
+              {/* DEEP VIEWS */}
+              {activeTab === 'favorites' && <Favorites favorites={favorites} onFav={toggleFavorite} />}
               {activeTab === 'settings' && <Settings onBack={() => setActiveTab('profile')} />}
             </section>
           </motion.div>
         </AnimatePresence>
 
-        {/* COMPOSANT OVERLAY */}
-        <InstantRizz 
-          isOpen={isInstantOpen} 
-          onClose={() => setIsInstantOpen(false)} 
-          library={rizzLibrary} 
-        />
+        {/* OVERLAY ENGINE */}
+        <InstantRizz isOpen={isInstantOpen} onClose={() => setIsInstantOpen(false)} library={rizzLibrary} />
+        
+        {/* ACTION BUTTON */}
+        <AnimatePresence>
+          {!['settings', 'favorites'].includes(activeTab) && (
+            <motion.button
+              whileTap={{ scale: 0.8 }}
+              onClick={() => setIsInstantOpen(true)}
+              className="fixed bottom-36 right-8 z-[150] bg-blue-600 p-6 rounded-[32px] shadow-[0_20px_50px_rgba(37,99,235,0.4)] border border-white/10"
+            >
+              <Zap size={28} fill="white" />
+            </motion.button>
+          )}
+        </AnimatePresence>
       </main>
 
-      {/* --- BOTTOM BAR NAVIGATION --- */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-3xl border-t border-white/5 z-[200] pb-12 pt-5 px-8">
-        <div className="max-w-md mx-auto flex items-center justify-between gap-2">
-          <NavButton 
-            active={activeTab === 'home'} 
-            icon={<LayoutDashboard size={26} />} 
-            label="Feed" 
-            onClick={() => { setDirection(-1); setActiveTab('home'); }} 
-          />
-          <NavButton 
-            active={activeTab === 'search'} 
-            icon={<SearchIcon size={26} />} 
-            label="Find" 
-            onClick={() => { setDirection(activeTab === 'home' ? 1 : -1); setActiveTab('search'); }} 
-          />
-          <NavButton 
-            active={activeTab === 'chat'} 
-            icon={<MessageSquare size={26} />} 
-            label="AI Chat" 
-            onClick={() => { setDirection(1); setActiveTab('chat'); }} 
-          />
-          <NavButton 
-            active={['profile', 'settings', 'favorites'].includes(activeTab)} 
-            icon={<User size={26} />} 
-            label="Profile" 
-            onClick={() => { setDirection(1); setActiveTab('profile'); }} 
-          />
+      {/* CORE NAVIGATION BAR */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-3xl border-t border-white/5 z-[200] pb-12 pt-5 px-8">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <NavBtn active={activeTab === 'home'} icon={<LayoutDashboard size={24}/>} label="Feed" onClick={() => setActiveTab('home')} />
+          <NavBtn active={activeTab === 'search'} icon={<SearchIcon size={24}/>} label="Find" onClick={() => setActiveTab('search')} />
+          <NavBtn active={activeTab === 'chat'} icon={<MessageSquare size={24}/>} label="AI" onClick={() => setActiveTab('chat')} />
+          <NavBtn active={['profile', 'settings', 'favorites'].includes(activeTab)} icon={<User size={24}/>} label="Me" onClick={() => setActiveTab('profile')} />
         </div>
       </nav>
 
-      {/* ONBOARDING LAYER */}
+      {/* ONBOARDING FLOW */}
       <AnimatePresence>
-        {showOnboarding && (
-          <Onboarding onComplete={() => {
-            localStorage.setItem('rizz_onboarded', 'true');
-            setShowOnboarding(false);
-          }} />
-        )}
+        {showOnboarding && <Onboarding onComplete={() => { setShowOnboarding(false); localStorage.setItem('rizz_onboarded', 'true'); }} />}
       </AnimatePresence>
 
     </div>
   );
 }
 
-// --- SOUS-COMPOSANTS INTERNES ---
+// --- ENGINE SUB-COMPONENTS ---
 
-function NavButton({ active, icon, label, onClick }) {
+function NavBtn({ active, icon, label, onClick }) {
   return (
-    <button 
-      onClick={onClick}
-      className="flex flex-col items-center flex-1 relative group"
-    >
-      <div className={`p-2.5 rounded-[22px] transition-all duration-500 ${
-        active ? 'bg-blue-600/15 text-blue-500 scale-110 shadow-[0_10px_25px_rgba(37,99,235,0.2)]' : 'text-zinc-600'
-      }`}>
+    <button onClick={onClick} className="flex flex-col items-center flex-1 transition-all">
+      <div className={`p-2.5 rounded-2xl transition-all duration-300 ${active ? 'bg-blue-600/10 text-blue-500 scale-110 shadow-[0_0_20px_rgba(37,99,235,0.1)]' : 'text-zinc-600'}`}>
         {icon}
       </div>
-      <span className={`text-[9px] font-black uppercase tracking-tighter mt-1.5 transition-all duration-300 ${
-        active ? 'text-blue-500 opacity-100' : 'opacity-0 translate-y-2'
-      }`}>
+      <span className={`text-[9px] font-black uppercase mt-1.5 tracking-tighter transition-all ${active ? 'text-blue-500 opacity-100' : 'opacity-0'}`}>
         {label}
       </span>
-      {active && (
-        <motion.div 
-          layoutId="nav-glow"
-          className="absolute -bottom-1 w-1 h-1 bg-blue-500 rounded-full shadow-[0_0_10px_#2563eb]"
-        />
-      )}
     </button>
   );
 }
 
-function SplashScreen({ version }) {
+function SplashScreen({ version, log }) {
   return (
-    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[1000]">
-      <div className="relative mb-12">
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.2, 1],
-            filter: ["blur(0px)", "blur(15px)", "blur(0px)"]
-          }}
-          transition={{ repeat: Infinity, duration: 3 }}
-          className="absolute inset-0 bg-blue-600/30 rounded-full blur-3xl"
-        />
-        <motion.div 
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="relative text-blue-600"
-        >
-          <Zap size={85} fill="currentColor" />
-        </motion.div>
-      </div>
-      
-      <div className="space-y-6 text-center">
-        <div className="flex flex-col items-center">
-          <h2 className="text-white text-[14px] font-black tracking-[1.2em] uppercase italic ml-[1.2em]">Rizz OS</h2>
-          <div className="w-48 h-[1px] bg-gradient-to-r from-transparent via-zinc-800 to-transparent mt-4" />
-        </div>
-        
-        <div className="flex items-center gap-3 justify-center">
-          <Cpu size={12} className="text-zinc-700 animate-spin" />
-          <p className="text-zinc-500 text-[9px] font-bold uppercase tracking-widest">
-            Loading Neural Engine v{version}
-          </p>
+    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[9999]">
+      <motion.div 
+        animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }} 
+        transition={{ repeat: Infinity, duration: 2.5 }}
+        className="text-blue-600 mb-12"
+      >
+        <Zap size={90} fill="currentColor" />
+      </motion.div>
+      <div className="text-center">
+        <h2 className="text-white text-[14px] font-black tracking-[1.2em] uppercase italic mb-4">Rizz OS</h2>
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-zinc-500 text-[9px] font-bold uppercase tracking-[0.2em] animate-pulse">{log}</p>
+          <div className="text-zinc-800 text-[7px] font-black uppercase">Core Engine v{version}</div>
         </div>
       </div>
     </div>
