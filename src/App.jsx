@@ -1,15 +1,20 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db, auth } from './firebase'; 
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { 
+  onAuthStateChanged, 
+  signOut, 
+  setPersistence, 
+  browserLocalPersistence 
+} from "firebase/auth";
 import { 
   doc, 
   setDoc, 
   onSnapshot, 
-  getDoc, 
   updateDoc, 
   arrayUnion, 
   arrayRemove,
-  serverTimestamp 
+  serverTimestamp,
+  getDoc
 } from "firebase/firestore";
 import { getSheetsData as fetchRizzData } from './services/dataService';
 import { 
@@ -18,23 +23,21 @@ import {
   User, 
   Zap, 
   Search as SearchIcon, 
-  Sparkles,
-  ShieldCheck,
   WifiOff,
-  AlertCircle,
-  ChevronLeft,
-  Settings as SettingsIcon,
-  Crown,
+  Fingerprint,
+  RefreshCcw,
+  ShieldCheck,
   Bell,
-  Cpu,
-  LogOut,
-  Fingerprint
+  MoreVertical,
+  ChevronRight,
+  Heart
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-// --- CORE COMPONENTS ---
+// --- IMPORT DES PAGES ET COMPOSANTS ---
+// On centralise les imports pour une meilleure visibilité
 import Auth from './components/Auth';
-import Home from './components/Home';
+import Discover from './pages/Discover'; 
 import Chat from './components/Chat';
 import Search from './components/Search';
 import Profile from './components/Profile'; 
@@ -43,297 +46,379 @@ import Favorites from './pages/Favorites';
 import Settings from './components/Settings';
 import Onboarding from './components/Onboarding';
 
-// --- ENGINE CONFIGURATION ---
+// --- CONSTANTES DE CONFIGURATION ---
 const MAIN_TABS = ['home', 'search', 'chat', 'profile'];
-const GESTURE_SWIPE_LIMIT = 60;
-const VERSION = "3.5.2-PRO";
+const SWIPE_SENSITIVITY = 80;
+const APP_VERSION = "5.0.1-PREMIUM";
 
-/**
- * RIZZ OS - TITAN ENGINE
- * Full Cloud Synchronization & Auth Guard System
- */
 export default function App() {
-  // --- AUTHENTICATION STATE ---
+  // --- ÉTATS D'AUTHENTIFICATION ET UTILISATEUR ---
   const [user, setUser] = useState(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [userData, setUserData] = useState(null);
-
-  // --- NAVIGATION STATE ---
-  const [activeTab, setActiveTab] = useState('home');
-  const [direction, setDirection] = useState(0); 
-  const [isInstantOpen, setIsInstantOpen] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isDataReady, setIsDataReady] = useState(false);
   
-  // --- DATA PIPELINE ---
+  // --- ÉTATS DE LA BIBLIOTHÈQUE ET FAVORIS ---
   const [rizzLibrary, setRizzLibrary] = useState([]);
   const [favorites, setFavorites] = useState([]);
-  const [isDataReady, setIsDataReady] = useState(false);
+  
+  // --- ÉTATS DE L'INTERFACE UTILISATEUR (UI) ---
+  const [activeTab, setActiveTab] = useState('home');
+  const [prevTab, setPrevTab] = useState('home');
+  const [direction, setDirection] = useState(0); 
+  const [isInstantOpen, setIsInstantOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-
-  // --- UI & FEEDBACK ---
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [notif, setNotif] = useState({ show: false, msg: "", type: "success" });
-  const [bootLog, setBootLog] = useState("Initializing Core...");
+  const [notification, setNotification] = useState({ show: false, message: "", type: "default" });
+  const [loadingStatus, setLoadingStatus] = useState("Démarrage du système...");
 
-  // --- 1. NETWORK INTELLIGENCE ---
+  // --- 1. GESTION DE LA CONNECTIVITÉ RÉSEAU ---
   useEffect(() => {
-    const updateStatus = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', updateStatus);
-    window.addEventListener('offline', updateStatus);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     return () => {
-      window.removeEventListener('online', updateStatus);
-      window.removeEventListener('offline', updateStatus);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  // --- 2. AUTHENTICATION WATCHER ---
+  // --- 2. INITIALISATION DE L'AUTHENTIFICATION AVEC PERSISTANCE ---
   useEffect(() => {
-    setBootLog("Verifying Identity...");
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsAuthLoading(false);
-      if (!currentUser) {
-        setIsDataReady(false);
-        setUserData(null);
+    const initAuth = async () => {
+      try {
+        setLoadingStatus("Vérification de la session...");
+        // browserLocalPersistence permet de rester connecté même après fermeture du navigateur
+        await setPersistence(auth, browserLocalPersistence);
+        
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+          setUser(currentUser);
+          setIsAuthLoading(false);
+          if (currentUser) {
+            setLoadingStatus(`Connecté en tant que ${currentUser.email}`);
+          }
+        });
+        return unsubscribe;
+      } catch (error) {
+        console.error("Erreur d'initialisation Auth:", error);
+        setIsAuthLoading(false);
       }
-    });
-    return () => unsubscribeAuth();
+    };
+    initAuth();
   }, []);
 
-  // --- 3. DATA & CLOUD SYNC ENGINE ---
+  // --- 3. SYNCHRONISATION DES DONNÉES CLOUD ET BIBLIOTHÈQUE ---
   useEffect(() => {
     if (!user) return;
 
-    const initializeUserSession = async () => {
-      setBootLog("Establishing Secure Cloud Link...");
-      try {
-        // A. Load Content Library (Google Sheets)
-        const libraryData = await fetchRizzData();
-        if (libraryData) setRizzLibrary(libraryData);
+    let isMounted = true;
 
-        // B. Setup Real-time Firestore Sync
+    const syncUserCloudData = async () => {
+      setLoadingStatus("Synchronisation des données...");
+      try {
+        // Chargement de la bibliothèque de phrases depuis le service
+        const libraryData = await fetchRizzData();
+        if (isMounted && libraryData) {
+          setRizzLibrary(libraryData);
+        }
+
         const userDocRef = doc(db, "users", user.uid);
         
-        const unsubscribeData = onSnapshot(userDocRef, (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.data();
+        // Écoute en temps réel des changements dans Firestore
+        const unsubFirestore = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
             setUserData(data);
             setFavorites(data.favs || []);
-            setBootLog("Neural Map Synced.");
           } else {
-            // New User Initialization
-            setBootLog("Creating Neural Profile...");
+            // Création du profil si c'est la première connexion
             setDoc(userDocRef, { 
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName || "Rizz Operative",
-              photoURL: user.photoURL || null,
+              uid: user.uid, 
+              email: user.email, 
+              username: user.displayName || "Membre",
               favs: [], 
-              level: 1,
               xp: 0,
-              createdAt: serverTimestamp(),
-              lastLogin: serverTimestamp()
+              level: 1,
+              createdAt: serverTimestamp() 
             });
           }
         });
 
-        // C. Onboarding Check
-        if (!localStorage.getItem('rizz_onboarded')) setShowOnboarding(true);
+        // Vérification du tutoriel
+        const hasCompletedOnboarding = localStorage.getItem('app_onboarded_v5');
+        if (!hasCompletedOnboarding) {
+          setShowOnboarding(true);
+        }
 
-        // Finalize Boot
-        setTimeout(() => setIsDataReady(true), 2000);
-        return () => unsubscribeData();
+        // Fin du chargement avec un léger délai pour la fluidité visuelle
+        setTimeout(() => {
+          if (isMounted) setIsDataReady(true);
+        }, 1500);
 
+        return unsubFirestore;
       } catch (error) {
-        console.error("Critical Engine Failure:", error);
-        setBootLog("Sync Error. Running Local.");
-        setTimeout(() => setIsDataReady(true), 1500);
+        console.error("Erreur de synchronisation Cloud:", error);
+        setLoadingStatus("Mode hors-ligne activé");
+        setTimeout(() => setIsDataReady(true), 1000);
       }
     };
 
-    initializeUserSession();
+    syncUserCloudData();
+    return () => { isMounted = false; };
   }, [user]);
 
-  // --- 4. GESTURE NAVIGATION CONTROL ---
-  const handleNavigationGesture = useCallback((_, info) => {
-    if (!MAIN_TABS.includes(activeTab)) return;
-
+  // --- 4. MOTEUR DE NAVIGATION ET GESTES (SWIPE) ---
+  const triggerTabChange = (newTab) => {
     const currentIndex = MAIN_TABS.indexOf(activeTab);
-    const { x: offset } = info.offset;
-    const { x: velocity } = info.velocity;
+    const nextIndex = MAIN_TABS.indexOf(newTab);
+    
+    setDirection(nextIndex > currentIndex ? 1 : -1);
+    setPrevTab(activeTab);
+    setActiveTab(newTab);
+  };
 
-    if ((offset < -GESTURE_SWIPE_LIMIT || velocity < -400) && currentIndex < MAIN_TABS.length - 1) {
-      setDirection(1);
-      setActiveTab(MAIN_TABS[currentIndex + 1]);
-    } else if ((offset > GESTURE_SWIPE_LIMIT || velocity > 400) && currentIndex > 0) {
-      setDirection(-1);
-      setActiveTab(MAIN_TABS[currentIndex - 1]);
+  const handleDragEnd = (event, info) => {
+    if (!MAIN_TABS.includes(activeTab)) return;
+    
+    const currentIndex = MAIN_TABS.indexOf(activeTab);
+    
+    if (info.offset.x < -SWIPE_SENSITIVITY && currentIndex < MAIN_TABS.length - 1) {
+      triggerTabChange(MAIN_TABS[currentIndex + 1]);
+    } else if (info.offset.x > SWIPE_SENSITIVITY && currentIndex > 0) {
+      triggerTabChange(MAIN_TABS[currentIndex - 1]);
     }
-  }, [activeTab]);
+  };
 
-  // --- 5. FAVORITES SYSTEM (OPTIMISTIC UI) ---
-  const toggleFavorite = async (text) => {
+  // --- 5. GESTION DES ACTIONS UTILISATEUR (FAVORIS) ---
+  const handleToggleFavorite = async (text) => {
     if (!user) return;
     
-    const isFav = favorites.includes(text);
-    const newFavs = isFav ? favorites.filter(f => f !== text) : [...favorites, text];
+    const isAlreadyInFavs = favorites.includes(text);
     
-    // Step 1: Instant Local Update
-    setFavorites(newFavs);
-    setNotif({ show: true, msg: isFav ? "Memory Purged" : "Neural Link Saved" });
-    setTimeout(() => setNotif(p => ({ ...p, show: false })), 2000);
+    // Feedback visuel immédiat (Optimistic UI)
+    setFavorites(current => 
+      isAlreadyInFavs ? current.filter(t => t !== text) : [...current, text]
+    );
 
-    // Step 2: Cloud Sync
+    setNotification({
+      show: true,
+      message: isAlreadyInFavs ? "Retiré des favoris" : "Ajouté aux favoris",
+      type: isAlreadyInFavs ? "remove" : "add"
+    });
+
+    setTimeout(() => setNotification({ show: false, message: "" }), 2000);
+
     try {
-      const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, {
-        favs: isFav ? arrayRemove(text) : arrayUnion(text)
+      const ref = doc(db, "users", user.uid);
+      await updateDoc(ref, {
+        favs: isAlreadyInFavs ? arrayRemove(text) : arrayUnion(text)
       });
     } catch (err) {
-      console.error("Cloud Rejection:", err);
+      console.error("Échec de la mise à jour des favoris:", err);
     }
   };
 
-  // --- 6. LOGOUT HANDLER ---
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setActiveTab('home');
-    } catch (e) { console.error("Logout failed", e); }
-  };
-
-  // --- RENDERING PIPELINE ---
-
-  // Phase A: Hardware/Auth Boot
-  if (isAuthLoading) return <SplashScreen version={VERSION} log="Hardware Boot..." />;
-
-  // Phase B: Unauthorized Access
+  // --- RENDU CONDITIONNEL (SCÉNARIOS DE CHARGEMENT) ---
+  if (isAuthLoading) return <LoadingScreen message="Chargement du profil..." />;
   if (!user) return <Auth />;
+  if (!isDataReady) return <LoadingScreen message={loadingStatus} />;
 
-  // Phase C: Data Synchronization
-  if (!isDataReady) return <SplashScreen version={VERSION} log={bootLog} />;
-
-  // Phase D: Operational OS
   return (
     <div className="bg-black min-h-screen text-white font-sans overflow-hidden select-none touch-none">
       
-      {/* HUD: SYSTEM NOTIFICATIONS */}
+      {/* SYSTÈME DE NOTIFICATIONS GLOBAL */}
       <AnimatePresence>
-        {notif.show && (
+        {notification.show && (
           <motion.div 
-            initial={{ y: -100, opacity: 0 }} 
-            animate={{ y: 30, opacity: 1 }} 
-            exit={{ y: -100, opacity: 0 }}
-            className="fixed top-0 left-1/2 -translate-x-1/2 z-[999] px-6 py-3 rounded-full bg-blue-600/10 border border-blue-500/30 backdrop-blur-3xl flex items-center gap-3"
+            initial={{ y: -100, x: "-50%", opacity: 0 }} 
+            animate={{ y: 50, x: "-50%", opacity: 1 }} 
+            exit={{ y: -100, x: "-50%", opacity: 0 }}
+            className="fixed top-0 left-1/2 z-[1000] px-6 py-4 rounded-3xl bg-zinc-900 border border-white/10 shadow-2xl flex items-center gap-3"
           >
-            <Fingerprint size={16} className="text-blue-400" />
-            <span className="text-[10px] font-black uppercase italic tracking-widest">{notif.msg}</span>
+            <div className={`p-2 rounded-full ${notification.type === 'add' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+              <Heart size={16} fill={notification.type === 'add' ? "currentColor" : "none"} />
+            </div>
+            <span className="text-xs font-bold uppercase tracking-widest">{notification.message}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* HUD: STATUS INDICATORS */}
-      <div className="fixed top-6 left-6 z-[500] flex items-center gap-4">
-        {!isOnline && (
-          <div className="flex items-center gap-2 bg-red-600/20 px-3 py-1 rounded-full border border-red-600/30">
-            <WifiOff size={10} className="text-red-500" />
-            <span className="text-[8px] font-black uppercase text-red-500 tracking-tighter">Local Link Only</span>
-          </div>
-        )}
-      </div>
+      {/* INDICATEUR HORS-LIGNE */}
+      {!isOnline && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[500] bg-red-600 px-4 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-2">
+          <WifiOff size={12} /> Mode Hors-Ligne
+        </div>
+      )}
 
-      <main className="max-w-md mx-auto h-screen relative bg-black">
+      {/* CADRE PRINCIPAL DE L'APPLICATION */}
+      <main className="max-w-md mx-auto h-screen relative bg-black shadow-2xl border-x border-white/5">
+        
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div 
             key={activeTab}
+            custom={direction}
             drag={MAIN_TABS.includes(activeTab) ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
-            onDragEnd={handleNavigationGesture}
-            initial={{ opacity: 0, x: direction > 0 ? 80 : -80 }}
+            onDragEnd={handleDragEnd}
+            initial={{ opacity: 0, x: direction > 0 ? 50 : -50 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction > 0 ? -80 : 80 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            exit={{ opacity: 0, x: direction > 0 ? -50 : 50 }}
+            transition={{ type: "spring", stiffness: 350, damping: 35 }}
             className="h-full w-full"
           >
-            <section className="h-full w-full pb-32 overflow-y-auto no-scrollbar">
-              {activeTab === 'home' && <Home library={rizzLibrary} setTab={setActiveTab} />}
-              {activeTab === 'search' && <Search library={rizzLibrary} />}
-              {activeTab === 'chat' && <Chat onFav={toggleFavorite} favorites={favorites} library={rizzLibrary} />}
-              {activeTab === 'profile' && <Profile user={user} userData={userData} favorites={favorites} library={rizzLibrary} setTab={setActiveTab} onLogout={handleLogout} />}
-              
-              {/* DEEP VIEWS */}
-              {activeTab === 'favorites' && <Favorites favorites={favorites} onFav={toggleFavorite} />}
-              {activeTab === 'settings' && <Settings onBack={() => setActiveTab('profile')} />}
+            {/* ZONE DE DÉFILEMENT DU CONTENU */}
+            <section className="h-full w-full overflow-y-auto no-scrollbar scroll-smooth">
+              <div className="pb-80 pt-2">
+                {activeTab === 'home' && <Discover />}
+                {activeTab === 'search' && <Search library={rizzLibrary} />}
+                {activeTab === 'chat' && (
+                  <Chat 
+                    onFav={handleToggleFavorite} 
+                    favorites={favorites} 
+                    library={rizzLibrary} 
+                  />
+                )}
+                {activeTab === 'profile' && (
+                  <Profile 
+                    user={user} 
+                    userData={userData} 
+                    setTab={triggerTabChange} 
+                    onLogout={() => signOut(auth)} 
+                  />
+                )}
+                
+                {/* VUES SECONDAIRES */}
+                {activeTab === 'favorites' && (
+                  <Favorites favorites={favorites} onFav={handleToggleFavorite} />
+                )}
+                {activeTab === 'settings' && (
+                  <Settings onBack={() => triggerTabChange('profile')} />
+                )}
+              </div>
             </section>
           </motion.div>
         </AnimatePresence>
 
-        {/* OVERLAY ENGINE */}
-        <InstantRizz isOpen={isInstantOpen} onClose={() => setIsInstantOpen(false)} library={rizzLibrary} />
-        
-        {/* ACTION BUTTON */}
+        {/* BOUTON D'ACTION RAPIDE (INSTANT RIZZ) */}
         <AnimatePresence>
           {!['settings', 'favorites'].includes(activeTab) && (
-            <motion.button
-              whileTap={{ scale: 0.8 }}
+            <motion.button 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => setIsInstantOpen(true)}
-              className="fixed bottom-36 right-8 z-[150] bg-blue-600 p-6 rounded-[32px] shadow-[0_20px_50px_rgba(37,99,235,0.4)] border border-white/10"
+              className="fixed bottom-36 right-8 z-[150] bg-blue-600 p-6 rounded-[30px] shadow-2xl border-4 border-black"
             >
-              <Zap size={28} fill="white" />
+              <Zap size={30} color="white" fill="white" />
             </motion.button>
           )}
         </AnimatePresence>
+
+        <InstantRizz 
+          isOpen={isInstantOpen} 
+          onClose={() => setIsInstantOpen(false)} 
+          library={rizzLibrary} 
+        />
       </main>
 
-      {/* CORE NAVIGATION BAR */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-3xl border-t border-white/5 z-[200] pb-12 pt-5 px-8">
+      {/* BARRE DE NAVIGATION INFÉRIEURE */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-black/50 backdrop-blur-3xl border-t border-white/10 z-[200] pb-12 pt-6 px-10">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          <NavBtn active={activeTab === 'home'} icon={<LayoutDashboard size={24}/>} label="Feed" onClick={() => setActiveTab('home')} />
-          <NavBtn active={activeTab === 'search'} icon={<SearchIcon size={24}/>} label="Find" onClick={() => setActiveTab('search')} />
-          <NavBtn active={activeTab === 'chat'} icon={<MessageSquare size={24}/>} label="AI" onClick={() => setActiveTab('chat')} />
-          <NavBtn active={['profile', 'settings', 'favorites'].includes(activeTab)} icon={<User size={24}/>} label="Me" onClick={() => setActiveTab('profile')} />
+          <NavigationItem 
+            isActive={activeTab === 'home'} 
+            icon={<LayoutDashboard size={24}/>} 
+            label="DÉCOUVRIR" 
+            onClick={() => triggerTabChange('home')} 
+          />
+          <NavigationItem 
+            isActive={activeTab === 'search'} 
+            icon={<SearchIcon size={24}/>} 
+            label="CHERCHER" 
+            onClick={() => triggerTabChange('search')} 
+          />
+          <NavigationItem 
+            isActive={activeTab === 'chat'} 
+            icon={<MessageSquare size={24}/>} 
+            label="COACH" 
+            onClick={() => triggerTabChange('chat')} 
+          />
+          <NavigationItem 
+            isActive={['profile', 'settings', 'favorites'].includes(activeTab)} 
+            icon={<User size={24}/>} 
+            label="PROFIL" 
+            onClick={() => triggerTabChange('profile')} 
+          />
         </div>
       </nav>
 
-      {/* ONBOARDING FLOW */}
+      {/* ÉCRAN D'INTRODUCTION (PREMIÈRE VISITE) */}
       <AnimatePresence>
-        {showOnboarding && <Onboarding onComplete={() => { setShowOnboarding(false); localStorage.setItem('rizz_onboarded', 'true'); }} />}
+        {showOnboarding && (
+          <Onboarding 
+            onComplete={() => { 
+              setShowOnboarding(false); 
+              localStorage.setItem('app_onboarded_v5', 'true'); 
+            }} 
+          />
+        )}
       </AnimatePresence>
-
     </div>
   );
 }
 
-// --- ENGINE SUB-COMPONENTS ---
+// --- SOUS-COMPOSANTS INTERNES ---
 
-function NavBtn({ active, icon, label, onClick }) {
+function NavigationItem({ isActive, icon, label, onClick }) {
   return (
-    <button onClick={onClick} className="flex flex-col items-center flex-1 transition-all">
-      <div className={`p-2.5 rounded-2xl transition-all duration-300 ${active ? 'bg-blue-600/10 text-blue-500 scale-110 shadow-[0_0_20px_rgba(37,99,235,0.1)]' : 'text-zinc-600'}`}>
+    <button 
+      onClick={onClick} 
+      className="flex flex-col items-center flex-1 transition-all duration-300"
+    >
+      <motion.div 
+        animate={{ 
+          scale: isActive ? 1.2 : 1,
+          color: isActive ? "#3b82f6" : "#52525b"
+        }}
+        className={`p-2 rounded-2xl ${isActive ? 'bg-blue-500/10 shadow-sm' : ''}`}
+      >
         {icon}
-      </div>
-      <span className={`text-[9px] font-black uppercase mt-1.5 tracking-tighter transition-all ${active ? 'text-blue-500 opacity-100' : 'opacity-0'}`}>
+      </motion.div>
+      <span className={`text-[8px] font-black mt-2 tracking-widest transition-all ${isActive ? 'opacity-100 text-blue-500' : 'opacity-0'}`}>
         {label}
       </span>
     </button>
   );
 }
 
-function SplashScreen({ version, log }) {
+function LoadingScreen({ message }) {
   return (
     <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[9999]">
       <motion.div 
-        animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }} 
-        transition={{ repeat: Infinity, duration: 2.5 }}
+        animate={{ 
+          scale: [1, 1.1, 1],
+          rotate: [0, 5, -5, 0]
+        }} 
+        transition={{ repeat: Infinity, duration: 3 }}
         className="text-blue-600 mb-12"
       >
         <Zap size={90} fill="currentColor" />
       </motion.div>
-      <div className="text-center">
-        <h2 className="text-white text-[14px] font-black tracking-[1.2em] uppercase italic mb-4">Rizz OS</h2>
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-zinc-500 text-[9px] font-bold uppercase tracking-[0.2em] animate-pulse">{log}</p>
-          <div className="text-zinc-800 text-[7px] font-black uppercase">Core Engine v{version}</div>
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-1 bg-zinc-900 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ x: "-100%" }}
+            animate={{ x: "100%" }}
+            transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+            className="w-full h-full bg-blue-600"
+          />
         </div>
+        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">
+          {message}
+        </p>
       </div>
     </div>
   );
