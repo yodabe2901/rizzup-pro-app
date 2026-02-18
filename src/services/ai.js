@@ -70,3 +70,9 @@ ${contextData}`
     return "Petit bug technique, mon rizz est en maintenance.";
   }
 };
+// Ajoute ceci dans src/services/ai.js
+export const validateRizz = async (text) => {
+  // Simule une vérification de qualité du Rizz
+  if (text.length < 5) return { valid: false, score: 0 };
+  return { valid: true, score: Math.floor(Math.random() * 100) };
+};
