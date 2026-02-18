@@ -27,13 +27,14 @@ import {
   Fingerprint,
   Heart,
   Settings as SettingsIcon,
-  Bell,
+  ShieldCheck,
   Activity,
-  ShieldCheck
+  ChevronRight,
+  Plus
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-// --- PAGE & COMPONENT IMPORTS ---
+// --- CORE PAGE IMPORTS ---
 import Auth from './components/Auth';
 import Discover from './pages/Discover'; 
 import Chat from './components/Chat';
@@ -46,195 +47,197 @@ import Onboarding from './components/Onboarding';
 
 // --- SYSTEM CONSTANTS ---
 const MAIN_TABS = ['home', 'search', 'chat', 'profile'];
-const SWIPE_THRESHOLD = 70;
-const VERSION = "6.0.0-ULTRA-SLIM";
+const SWIPE_POWER = 0.2;
+const APP_VER = "6.5.0-STABLE-EN";
 
 export default function App() {
-  // --- CORE STATES ---
+  // --- AUTHENTICATION & USER DATA STATES ---
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDataReady, setIsDataReady] = useState(false);
+  
+  // --- CONTENT & LIBRARY STATES ---
   const [rizzLibrary, setRizzLibrary] = useState([]);
   const [favorites, setFavorites] = useState([]);
   
-  // --- UI STATES ---
+  // --- INTERFACE & NAVIGATION STATES ---
   const [activeTab, setActiveTab] = useState('home');
   const [direction, setDirection] = useState(0); 
   const [isInstantOpen, setIsInstantOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [notif, setNotif] = useState({ show: false, msg: "", type: "info" });
-  const [bootStatus, setBootStatus] = useState("Initializing...");
+  const [toast, setToast] = useState({ show: false, msg: "" });
+  const [bootLog, setBootLog] = useState("Initializing Core...");
 
-  // --- 1. NETWORK CONNECTIVITY MONITOR ---
+  // --- 1. NETWORK STATUS MONITOR ---
   useEffect(() => {
-    const handleStatus = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', handleStatus);
-    window.addEventListener('offline', handleStatus);
+    const handleConn = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', handleConn);
+    window.addEventListener('offline', handleConn);
     return () => {
-      window.removeEventListener('online', handleStatus);
-      window.removeEventListener('offline', handleStatus);
+      window.removeEventListener('online', handleConn);
+      window.removeEventListener('offline', handleConn);
     };
   }, []);
 
-  // --- 2. AUTHENTICATION ENGINE ---
+  // --- 2. AUTHENTICATION ENGINE (WITH PERSISTENCE) ---
   useEffect(() => {
-    const startAuth = async () => {
+    const bootSequence = async () => {
       try {
-        setBootStatus("Checking session...");
+        setBootLog("Establishing secure session...");
         await setPersistence(auth, browserLocalPersistence);
         
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        return onAuthStateChanged(auth, (currentUser) => {
           setUser(currentUser);
           setIsAuthLoading(false);
-          if (currentUser) setBootStatus(`Authenticated: ${currentUser.email}`);
+          if (currentUser) setBootLog(`Logged in as: ${currentUser.email}`);
         });
-        return unsubscribe;
-      } catch (err) {
-        console.error("Auth initialization failed", err);
+      } catch (error) {
+        console.error("Critical Auth Error:", error);
         setIsAuthLoading(false);
       }
     };
-    startAuth();
+    bootSequence();
   }, []);
 
-  // --- 3. DATA SYNC PIPELINE (FIRESTORE & LIBRARY) ---
+  // --- 3. DATA SYNCHRONIZATION (FIRESTORE + GOOGLE SHEETS) ---
   useEffect(() => {
     if (!user) return;
 
-    const syncData = async () => {
-      setBootStatus("Syncing Library...");
+    const syncPipeline = async () => {
+      setBootLog("Syncing Cloud Library...");
       try {
-        // Fetch library from Service (Sheets/API)
-        const data = await fetchRizzData();
-        if (data) setRizzLibrary(data);
+        // Fetch library content
+        const content = await fetchRizzData();
+        if (content) setRizzLibrary(content);
 
-        // Real-time User Data Listener
+        // User Profile Real-time Sync
         const userRef = doc(db, "users", user.uid);
-        const unsubscribeDoc = onSnapshot(userRef, (snap) => {
+        const unsubscribe = onSnapshot(userRef, (snap) => {
           if (snap.exists()) {
-            const cloudData = snap.data();
-            setUserData(cloudData);
-            setFavorites(cloudData.favs || []);
+            const data = snap.data();
+            setUserData(data);
+            setFavorites(data.favs || []);
           } else {
-            // Auto-create profile if missing
+            // First time initialization
             setDoc(userRef, { 
-              uid: user.uid, 
-              email: user.email, 
-              username: user.displayName || "User",
-              favs: [], 
-              xp: 0, level: 1,
-              createdAt: serverTimestamp() 
+              uid: user.uid, email: user.email, 
+              username: user.displayName || "New User",
+              favs: [], xp: 0, level: 1, createdAt: serverTimestamp() 
             });
           }
         });
 
-        // Onboarding Check
-        if (!localStorage.getItem('app_v6_onboarded')) setShowOnboarding(true);
+        // Version-specific onboarding check
+        if (!localStorage.getItem('rizz_v65_onboarded')) setShowOnboarding(true);
 
+        // Smooth transition to app
+        setTimeout(() => setIsDataReady(true), 1500);
+        return unsubscribe;
+      } catch (e) {
+        setBootLog("Local database engaged.");
         setTimeout(() => setIsDataReady(true), 1000);
-        return unsubscribeDoc;
-      } catch (error) {
-        setBootStatus("Offline Mode Active");
-        setTimeout(() => setIsDataReady(true), 800);
       }
     };
 
-    syncData();
+    syncPipeline();
   }, [user]);
 
-  // --- 4. NAVIGATION LOGIC (SWIPE & TABS) ---
-  const handleTabSwitch = useCallback((target) => {
-    const from = MAIN_TABS.indexOf(activeTab);
-    const to = MAIN_TABS.indexOf(target);
-    setDirection(to > from ? 1 : -1);
-    setActiveTab(target);
+  // --- 4. NAVIGATION ENGINE (TABS & SWIPE) ---
+  const navigateTo = useCallback((tabName) => {
+    const currentIdx = MAIN_TABS.indexOf(activeTab);
+    const targetIdx = MAIN_TABS.indexOf(tabName);
+    setDirection(targetIdx > currentIdx ? 1 : -1);
+    setActiveTab(tabName);
   }, [activeTab]);
 
-  const onSwipeEnd = (e, info) => {
-    if (!MAIN_TABS.includes(activeTab)) return;
-    const idx = MAIN_TABS.indexOf(activeTab);
-    
-    if (info.offset.x < -SWIPE_THRESHOLD && idx < MAIN_TABS.length - 1) {
-      handleTabSwitch(MAIN_TABS[idx + 1]);
-    } else if (info.offset.x > SWIPE_THRESHOLD && idx > 0) {
-      handleTabSwitch(MAIN_TABS[idx - 1]);
-    }
-  };
-
-  // --- 5. CLOUD FAVORITES HANDLER ---
-  const toggleFav = async (text) => {
+  // --- 5. GLOBAL FAVORITES HANDLER ---
+  const handleToggleFav = async (text) => {
     if (!user) return;
-    const isFav = favorites.includes(text);
+    const isAlreadyFav = favorites.includes(text);
     
-    setFavorites(prev => isFav ? prev.filter(i => i !== text) : [...prev, text]);
-    setNotif({ show: true, msg: isFav ? "Removed" : "Saved" });
-    setTimeout(() => setNotif({ show: false, msg: "" }), 2000);
+    // UI Optimistic Update
+    setFavorites(prev => isAlreadyFav ? prev.filter(t => t !== text) : [...prev, text]);
+    setToast({ show: true, msg: isAlreadyFav ? "Removed" : "Saved to Profile" });
+    setTimeout(() => setToast({ show: false, msg: "" }), 2500);
 
     try {
       const ref = doc(db, "users", user.uid);
-      await updateDoc(ref, { favs: isFav ? arrayRemove(text) : arrayUnion(text) });
-    } catch (e) { console.error("Favorite sync failed", e); }
+      await updateDoc(ref, { 
+        favs: isAlreadyFav ? arrayRemove(text) : arrayUnion(text) 
+      });
+    } catch (err) { console.error("Sync Error", err); }
   };
 
-  // --- RENDER SCENARIOS ---
-  if (isAuthLoading) return <BootScreen log="CORE_START" />;
+  // --- LOADING / AUTH ROUTING ---
+  if (isAuthLoading) return <SplashScreen log="BOOT_UP" />;
   if (!user) return <Auth />;
-  if (!isDataReady) return <BootScreen log={bootStatus} />;
+  if (!isDataReady) return <SplashScreen log={bootLog} />;
 
   return (
-    <div className="bg-black min-h-screen text-white font-sans overflow-hidden select-none touch-none">
+    <div className="bg-black min-h-screen text-white font-sans overflow-hidden select-none antialiased">
       
-      {/* HUD NOTIFICATIONS */}
+      {/* GLOBAL TOAST NOTIFICATION */}
       <AnimatePresence>
-        {notif.show && (
+        {toast.show && (
           <motion.div 
-            initial={{ y: -50, x: "-50%", opacity: 0 }} 
-            animate={{ y: 30, x: "-50%", opacity: 1 }} 
-            exit={{ y: -50, x: "-50%", opacity: 0 }}
-            className="fixed top-0 left-1/2 z-[1000] px-5 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/10 shadow-xl flex items-center gap-2"
+            initial={{ y: -60, x: "-50%", opacity: 0 }} 
+            animate={{ y: 40, x: "-50%", opacity: 1 }} 
+            exit={{ y: -60, x: "-50%", opacity: 0 }}
+            className="fixed top-0 left-1/2 z-[1000] px-6 py-2.5 rounded-full bg-zinc-900 border border-white/10 shadow-2xl flex items-center gap-2"
           >
-            <ShieldCheck size={12} className="text-blue-500" />
-            <span className="text-[9px] font-black uppercase tracking-widest">{notif.msg}</span>
+            <ShieldCheck size={14} className="text-blue-500" />
+            <span className="text-[11px] font-black uppercase tracking-widest">{toast.msg}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* MAIN APPLICATION CONTAINER */}
-      <main className="max-w-md mx-auto h-screen relative bg-black border-x border-white/5">
+      {/* OFFLINE BANNER */}
+      {!isOnline && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[500] bg-red-600/90 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-xl">
+          <WifiOff size={12} /> Connection Lost - Offline Mode
+        </div>
+      )}
+
+      {/* MOBILE APPLICATION SHELL */}
+      <main className="max-w-md mx-auto h-screen relative bg-black border-x border-white/5 shadow-2xl overflow-hidden">
         
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div 
-            key={activeTab} custom={direction} onDragEnd={onSwipeEnd}
-            drag={MAIN_TABS.includes(activeTab) ? "x" : false} dragConstraints={{ left: 0, right: 0 }}
-            initial={{ opacity: 0, x: direction > 0 ? 30 : -30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: direction > 0 ? -30 : 30 }}
-            transition={{ type: "spring", stiffness: 400, damping: 40 }}
+            key={activeTab} custom={direction}
+            initial={{ opacity: 0, x: direction > 0 ? 50 : -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: direction > 0 ? -50 : 50 }}
+            transition={{ type: "spring", stiffness: 350, damping: 35 }}
             className="h-full w-full"
           >
+            {/* SCROLLABLE VIEWPORT */}
             <section className="h-full w-full overflow-y-auto no-scrollbar scroll-smooth">
-              {/* pb-32 to leave space for the ultra-slim bar */}
-              <div className="pb-32 pt-2 px-3"> 
+              <div className="pb-44 pt-4 px-4"> 
                 {activeTab === 'home' && <Discover />}
                 {activeTab === 'search' && <Search library={rizzLibrary} />}
-                {activeTab === 'chat' && <Chat onFav={toggleFav} favorites={favorites} library={rizzLibrary} />}
-                {activeTab === 'profile' && <Profile user={user} userData={userData} setTab={handleTabSwitch} onLogout={() => signOut(auth)} />}
-                {activeTab === 'favorites' && <Favorites favorites={favorites} onFav={toggleFav} />}
-                {activeTab === 'settings' && <Settings onBack={() => handleTabSwitch('profile')} />}
+                {activeTab === 'chat' && <Chat onFav={handleToggleFav} favorites={favorites} library={rizzLibrary} />}
+                {activeTab === 'profile' && <Profile user={user} userData={userData} setTab={navigateTo} onLogout={() => signOut(auth)} />}
+                
+                {/* AUXILIARY VIEWS */}
+                {activeTab === 'favorites' && <Favorites favorites={favorites} onFav={handleToggleFav} />}
+                {activeTab === 'settings' && <Settings onBack={() => navigateTo('profile')} />}
               </div>
             </section>
           </motion.div>
         </AnimatePresence>
 
-        {/* ULTRA-COMPACT FLOATING ACTION BUTTON */}
+        {/* COMPACT FLOATING ZAP BUTTON */}
         <AnimatePresence>
           {!['settings', 'favorites'].includes(activeTab) && (
             <motion.button 
-              initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} whileTap={{ scale: 0.9 }}
+              initial={{ scale: 0, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0, y: 20 }} 
+              whileTap={{ scale: 0.85 }}
               onClick={() => setIsInstantOpen(true)}
-              className="fixed bottom-16 right-6 z-[150] bg-blue-600 p-4 rounded-2xl shadow-2xl border-2 border-black"
+              className="fixed bottom-28 right-8 z-[150] bg-blue-600 p-5 rounded-[28px] shadow-2xl border-4 border-black"
             >
-              <Zap size={22} color="white" fill="white" />
+              <Zap size={26} color="white" fill="white" />
             </motion.button>
           )}
         </AnimatePresence>
@@ -242,43 +245,77 @@ export default function App() {
         <InstantRizz isOpen={isInstantOpen} onClose={() => setIsInstantOpen(false)} library={rizzLibrary} />
       </main>
 
-      {/* ULTRA-SLIM BOTTOM NAVIGATION BAR */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-white/5 z-[200] pt-2 pb-2 px-6">
-        <div className="max-w-md mx-auto flex items-center justify-around">
-          <NavItem active={activeTab === 'home'} icon={<LayoutDashboard size={18}/>} label="Feed" onClick={() => handleTabSwitch('home')} />
-          <NavItem active={activeTab === 'search'} icon={<SearchIcon size={18}/>} label="Search" onClick={() => handleTabSwitch('search')} />
-          <NavItem active={activeTab === 'chat'} icon={<MessageSquare size={18}/>} label="AI" onClick={() => handleTabSwitch('chat')} />
-          <NavItem active={['profile', 'settings', 'favorites'].includes(activeTab)} icon={<User size={18}/>} label="Me" onClick={() => handleTabSwitch('profile')} />
+      {/* SLIM-LINE BOTTOM NAVIGATION BAR */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-3xl border-t border-white/10 z-[200] pt-3 pb-6 px-8">
+        <div className="max-w-md mx-auto flex items-center justify-between gap-1">
+          <NavigationButton active={activeTab === 'home'} icon={<LayoutDashboard size={22}/>} label="Feed" onClick={() => navigateTo('home')} />
+          <NavigationButton active={activeTab === 'search'} icon={<SearchIcon size={22}/>} label="Search" onClick={() => navigateTo('search')} />
+          <NavigationButton active={activeTab === 'chat'} icon={<MessageSquare size={22}/>} label="Coach" onClick={() => navigateTo('chat')} />
+          <NavigationButton active={['profile', 'settings', 'favorites'].includes(activeTab)} icon={<User size={22}/>} label="Me" onClick={() => navigateTo('profile')} />
         </div>
       </nav>
 
-      {showOnboarding && <Onboarding onComplete={() => { setShowOnboarding(false); localStorage.setItem('app_v6_onboarded', 'true'); }} />}
+      {/* INITIAL ONBOARDING OVERLAY */}
+      {showOnboarding && (
+        <Onboarding 
+          onComplete={() => { 
+            setShowOnboarding(false); 
+            localStorage.setItem('rizz_v65_onboarded', 'true'); 
+          }} 
+        />
+      )}
     </div>
   );
 }
 
-// --- REUSABLE SUB-COMPONENTS ---
+// --- NAVIGATION UI SUB-COMPONENT ---
 
-function NavItem({ active, icon, label, onClick }) {
+function NavigationButton({ active, icon, label, onClick }) {
   return (
-    <button onClick={onClick} className="flex flex-col items-center justify-center flex-1 py-1 transition-all">
-      <div className={`transition-colors duration-300 ${active ? 'text-blue-500' : 'text-zinc-600'}`}>
+    <button onClick={onClick} className="flex flex-col items-center justify-center flex-1 py-1 relative">
+      <motion.div 
+        animate={{ 
+          scale: active ? 1.15 : 1, 
+          color: active ? "#3b82f6" : "#4b5563" 
+        }}
+        className="transition-colors duration-200"
+      >
         {icon}
-      </div>
-      <span className={`text-[8px] font-bold mt-0.5 uppercase tracking-tighter ${active ? 'text-blue-500' : 'text-zinc-700'}`}>
+      </motion.div>
+      <span className={`text-[10px] font-bold mt-1 tracking-tight transition-opacity duration-300 ${active ? 'text-blue-500 opacity-100' : 'text-zinc-600 opacity-60'}`}>
         {label}
       </span>
+      {active && (
+        <motion.div layoutId="nav-dot" className="absolute -top-1 w-1 h-1 bg-blue-500 rounded-full" />
+      )}
     </button>
   );
 }
 
-function BootScreen({ log }) {
+// --- BOOT ANIMATION SUB-COMPONENT ---
+
+function SplashScreen({ log }) {
   return (
     <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[9999]">
-      <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.5 }} className="text-blue-600 mb-8">
-        <Zap size={50} fill="currentColor" />
+      <motion.div 
+        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 1, 0.3] }} 
+        transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }} 
+        className="text-blue-600 mb-10"
+      >
+        <Zap size={70} fill="currentColor" />
       </motion.div>
-      <p className="text-zinc-500 text-[8px] font-bold uppercase tracking-[0.5em]">{log}</p>
+      <div className="flex flex-col items-center gap-5">
+        <div className="w-20 h-0.5 bg-zinc-900 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ x: "-100%" }} animate={{ x: "100%" }} 
+            transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+            className="w-full h-full bg-blue-600" 
+          />
+        </div>
+        <p className="text-zinc-600 text-[9px] font-black uppercase tracking-[0.5em] antialiased">
+          {log}
+        </p>
+      </div>
     </div>
   );
 }
