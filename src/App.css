@@ -1,81 +1,19 @@
-/* RESET COMPLET DES STYLES VITE PAR DEFAUT */
-#root {
-  width: 100%;
-  height: 100vh;
-  height: -webkit-fill-available; /* Correctif crucial pour iOS/Android WebView */
-  margin: 0;
-  padding: 0;
-  text-align: left; /* Supprime le centrage forcé */
-  display: block;
-}
-
-/* STRUCTURE DE L'APPLICATION APK */
-.app-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background: black;
+/* Zone de sécurité pour que le chat ne passe pas sous la nav */
+.chat-container {
   display: flex;
   flex-direction: column;
-  /* Utilise les variables de zone sûre injectées par le téléphone */
-  padding-top: var(--sat);
-  padding-bottom: var(--sab);
+  height: 100%;
+  /* pb-32 ou calcul dynamique avec la barre de navigation */
+  padding-bottom: calc(var(--sab) + 80px); 
 }
 
-/* GESTION DU SCROLL FLUIDE ET CACHÉ */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* FIX POUR LES ELEMENTS FIXES DANS UNE WEBVIEW APK */
-nav {
-  /* Assure que la barre de nav ne remonte pas avec le clavier */
+.chat-input-wrapper {
   position: fixed;
-  bottom: 0;
+  /* On le place juste au-dessus de la barre d'icônes */
+  bottom: calc(var(--sab) + 70px); 
   left: 0;
   right: 0;
-  /* On rajoute la marge de sécurité Android/iOS en bas de la barre */
-  padding-bottom: calc(var(--sab) + 12px) !important;
-}
-
-/* CORRECTION DES CARTES POUR QU'ELLES TOUCHENT LES BORDS SI BESOIN */
-.full-width-mobile {
-  width: 100vw;
-  margin-left: 0;
-  margin-right: 0;
-}
-
-/* ANTI-ZOOM ET OPTIMISATION TACTILE */
-input, textarea, button {
-  font-size: 16px !important; /* Empêche l'auto-zoom sur focus Android */
-  outline: none;
-}
-
-button:active {
-  transform: scale(0.98);
-  transition: transform 0.1s ease;
-}
-
-/* ANIMATIONS DE PAGES */
-.fade-enter {
-  opacity: 0;
-}
-.fade-enter-active {
-  opacity: 1;
-  transition: opacity 300ms ease-in;
-}
-
-/* LOGO ET CHARGEMENT */
-.boot-loader {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  background: black;
+  z-index: 180; /* En dessous de la nav (200) mais au dessus du contenu */
+  background: transparent;
+  padding: 10px;
 }
