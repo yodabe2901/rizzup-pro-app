@@ -1,3 +1,4 @@
+import { analyzeCommentSentiment } from '../services/rizzAnalyzer';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
