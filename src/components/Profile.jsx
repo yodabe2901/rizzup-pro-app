@@ -15,191 +15,287 @@ import {
   Star,
   Clock,
   TrendingUp,
-  Share2
+  Share2,
+  Gem,
+  Shield,
+  ZapOff,
+  Fingerprint,
+  Activity,
+  Trophy,
+  Sparkles,
+  Bell,
+  Lock,
+  Smartphone,
+  Info
 } from 'lucide-react';
 
 export default function Profile({ user, userData, setTab, onLogout }) {
-  // --- PROGRESS CALCULATION ---
+  // --- LOGIQUE DE CALCUL AVANCÉE ---
   const level = userData?.level || 1;
   const xp = userData?.xp || 0;
   const xpToNextLevel = level * 1000;
   const progress = Math.min((xp / xpToNextLevel) * 100, 100);
 
-  // --- STATS CONFIGURATION ---
-  const stats = [
-    { label: 'Total XP', value: xp.toLocaleString(), icon: <Zap size={20} />, color: 'text-blue-500' },
-    { label: 'Rank', value: level > 10 ? 'Elite' : 'Rookie', icon: <Crown size={20} />, color: 'text-yellow-500' },
-    { label: 'Streak', value: '7 Days', icon: <Flame size={20} />, color: 'text-orange-500' }
+  // --- CONFIGURATION DES STATS PRINCIPALES ---
+  const mainStats = [
+    { label: 'Total XP', value: xp.toLocaleString(), icon: <Zap size={22} />, color: 'text-blue-500', shadow: 'shadow-blue-500/20' },
+    { label: 'Rank', value: level > 10 ? 'Elite' : 'Rookie', icon: <Crown size={22} />, color: 'text-yellow-500', shadow: 'shadow-yellow-500/20' },
+    { label: 'Streak', value: '7 Days', icon: <Flame size={22} />, color: 'text-orange-500', shadow: 'shadow-orange-500/20' }
   ];
 
+  // --- CONFIGURATION DES STATS SECONDAIRES ---
   const secondaryStats = [
-    { label: 'Saved', value: userData?.favs?.length || 0, icon: <Heart size={16} /> },
-    { label: 'Analyzed', value: '124', icon: <Target size={16} /> },
-    { label: 'Shared', value: '12', icon: <Share2 size={16} /> }
+    { label: 'Saved', value: userData?.favs?.length || 0, icon: <Heart size={16} />, color: 'text-pink-500' },
+    { label: 'Analyzed', value: '124', icon: <Target size={16} />, color: 'text-emerald-500' },
+    { label: 'Shared', value: '12', icon: <Share2 size={16} />, color: 'text-cyan-500' },
+    { label: 'Aura', value: '+850', icon: <Sparkles size={16} />, color: 'text-purple-500' }
+  ];
+
+  // --- STRUCTURE DES MENUS ---
+  const menuGroups = [
+    {
+      groupTitle: "Social & Library",
+      items: [
+        { id: 'favorites', title: "Favorite Library", sub: "Your curated pick-up lines", icon: <Heart size={20} />, color: "text-pink-500", badge: userData?.favs?.length },
+        { id: 'history', title: "Rizz History", sub: "Review past interactions", icon: <Clock size={20} />, color: "text-blue-400" },
+        { id: 'analytics', title: "Performance", sub: "Detailed rizz statistics", icon: <TrendingUp size={20} />, color: "text-emerald-400" }
+      ]
+    },
+    {
+      groupTitle: "System & Security",
+      items: [
+        { id: 'settings', title: "App Settings", sub: "Preferences and UI", icon: <SettingsIcon size={20} />, color: "text-zinc-400" },
+        { id: 'security', title: "Account Security", sub: "Privacy and biometrics", icon: <ShieldCheck size={20} />, color: "text-blue-500" },
+        { id: 'premium', title: "Pro Subscription", sub: "Manage your RizzUp Pro", icon: <Gem size={20} />, color: "text-yellow-500", label: "Active" }
+      ]
+    }
   ];
 
   return (
-    <div className="flex flex-col gap-8 pb-10">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-col gap-8 pb-40 pt-4 px-4 w-full max-w-2xl mx-auto overflow-y-auto no-scrollbar"
+    >
       
-      {/* 1. HERO SECTION: USER IDENTITY */}
-      <section className="relative overflow-hidden bg-zinc-900/40 p-6 rounded-[35px] border border-white/5 shadow-2xl">
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-          <Zap size={120} fill="currentColor" className="text-blue-600" />
+      {/* 1. HERO SECTION: IDENTITY CARD */}
+      <section className="relative overflow-hidden bg-zinc-900/60 p-8 rounded-[45px] border border-white/10 shadow-2xl backdrop-blur-xl">
+        <div className="absolute -top-10 -right-10 opacity-5">
+          <Fingerprint size={240} className="text-white" />
         </div>
         
-        <div className="flex items-center gap-5 relative z-10">
-          <div className="relative">
-            <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-blue-800 rounded-full flex items-center justify-center border-4 border-black shadow-xl">
-              <User size={45} color="white" fill="white" />
+        <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+          {/* Avatar Container */}
+          <div className="relative group">
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className="absolute -inset-2 bg-gradient-to-tr from-blue-600 via-transparent to-cyan-400 rounded-full opacity-40 blur-sm"
+            ></motion.div>
+            <div className="w-32 h-32 bg-zinc-950 rounded-full flex items-center justify-center border-4 border-zinc-900 shadow-2xl relative overflow-hidden">
+              <User size={60} color="white" fill="white" className="mt-4 opacity-90" />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20" />
             </div>
             <motion.div 
               initial={{ scale: 0 }} animate={{ scale: 1 }}
-              className="absolute -bottom-1 -right-1 bg-yellow-500 p-2 rounded-full border-4 border-black"
+              className="absolute bottom-1 right-1 bg-yellow-500 p-2.5 rounded-full border-4 border-zinc-950 shadow-xl"
             >
-              <Crown size={16} color="black" fill="black" />
+              <Crown size={20} color="black" fill="black" />
             </motion.div>
           </div>
 
-          <div className="flex flex-col">
-            <h2 className="text-2xl font-black tracking-tighter uppercase leading-none mb-1">
-              {userData?.username || 'Rizz Master'}
-            </h2>
-            <p className="text-zinc-500 text-[10px] font-bold tracking-[0.2em] uppercase mb-3">
-              {user?.email || 'Premium Member'}
+          <div className="flex flex-col items-center md:items-start text-center md:text-left flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <h2 className="text-3xl font-black tracking-tighter uppercase italic text-white">
+                {userData?.username || 'Rizzler Elite'}
+              </h2>
+              <div className="bg-blue-500/20 p-1 rounded-full border border-blue-500/30">
+                <ShieldCheck size={14} className="text-blue-500" />
+              </div>
+            </div>
+            <p className="text-zinc-500 text-xs font-bold tracking-[0.3em] uppercase mb-5 opacity-60">
+              {user?.email || 'authenticated@rizzup.io'}
             </p>
-            <div className="flex gap-2">
-              <span className="px-3 py-1 bg-blue-600 text-[9px] font-black rounded-full uppercase tracking-widest">Pro Player</span>
-              <span className="px-3 py-1 bg-zinc-800 text-[9px] font-black rounded-full uppercase tracking-widest text-zinc-400">Lv.{level}</span>
+            <div className="flex flex-wrap justify-center md:justify-start gap-3">
+              <span className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-[10px] font-black rounded-full uppercase tracking-widest text-white shadow-lg shadow-blue-600/20">
+                <Gem size={12} /> Pro Member
+              </span>
+              <span className="px-4 py-1.5 bg-zinc-800 text-[10px] font-black rounded-full uppercase tracking-widest text-zinc-400 border border-white/5">
+                Level {level}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* PROGRESS BAR */}
-        <div className="mt-8 space-y-2">
-          <div className="flex justify-between items-end px-1">
-            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Level Progress</span>
-            <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{progress.toFixed(0)}%</span>
+        {/* PROGRESS OS INTERFACE */}
+        <div className="mt-10 bg-black/40 p-6 rounded-[30px] border border-white/5 backdrop-blur-md">
+          <div className="flex justify-between items-end mb-4 px-1">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Current Aura</span>
+              <span className="text-xl font-black text-blue-500 italic leading-none">Level {level}</span>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] font-black text-zinc-600 uppercase block">XP Progression</span>
+              <span className="text-sm font-black text-white tracking-tighter">{xp.toLocaleString()} <span className="text-zinc-500">/ {xpToNextLevel.toLocaleString()}</span></span>
+            </div>
           </div>
-          <div className="h-3 w-full bg-black/40 rounded-full border border-white/5 overflow-hidden p-0.5">
+          <div className="h-4 w-full bg-zinc-950 rounded-full border border-white/5 overflow-hidden p-0.5 relative">
             <motion.div 
-              initial={{ width: 0 }} animate={{ width: `${progress}%` }}
-              transition={{ duration: 1, ease: "easeOut" }}
-              className="h-full bg-blue-600 rounded-full shadow-[0_0_15px_rgba(37,99,235,0.5)]"
-            />
+              initial={{ width: 0 }} 
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 1.5, ease: "circOut" }}
+              className="h-full bg-gradient-to-r from-blue-700 via-blue-500 to-cyan-400 rounded-full relative"
+            >
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.2)_50%,transparent_100%)] animate-shimmer" />
+            </motion.div>
+          </div>
+          <div className="flex justify-between mt-3 opacity-30">
+             {[...Array(5)].map((_, i) => <div key={i} className="w-1 h-1 bg-white rounded-full" />)}
           </div>
         </div>
       </section>
 
-      {/* 2. STATS GRID: DATA INSIGHTS */}
-      <section className="grid grid-cols-3 gap-3">
-        {stats.map((stat, i) => (
+      {/* 2. ADVANCED STATS GRID */}
+      <section className="grid grid-cols-3 gap-4">
+        {mainStats.map((stat, i) => (
           <motion.div 
-            key={i} whileTap={{ scale: 0.95 }}
-            className="bg-zinc-900/40 p-4 rounded-[28px] border border-white/5 flex flex-col items-center justify-center gap-1 text-center"
+            key={i} 
+            whileTap={{ scale: 0.95 }}
+            className={`bg-zinc-900/40 p-5 rounded-[32px] border border-white/5 flex flex-col items-center justify-center gap-2 text-center shadow-xl ${stat.shadow}`}
           >
-            <div className={stat.color}>{stat.icon}</div>
-            <span className="text-xl font-black tracking-tighter">{stat.value}</span>
-            <span className="text-[7px] text-zinc-600 font-bold uppercase tracking-[0.2em]">{stat.label}</span>
+            <div className={`${stat.color} p-3 bg-white/5 rounded-2xl`}>{stat.icon}</div>
+            <span className="text-2xl font-black tracking-tighter text-white">{stat.value}</span>
+            <span className="text-[8px] text-zinc-500 font-bold uppercase tracking-[0.2em]">{stat.label}</span>
           </motion.div>
         ))}
       </section>
 
-      {/* 3. ACHIEVEMENT PREVIEW */}
-      <section className="flex flex-col gap-3">
-        <h3 className="text-[11px] font-black text-zinc-600 uppercase tracking-[0.3em] ml-4 flex items-center gap-2">
-          <Award size={14} /> My Badges
-        </h3>
-        <div className="flex gap-3 overflow-x-auto no-scrollbar px-2 py-1">
-          {[1, 2, 3, 4].map((badge) => (
-            <div key={badge} className="min-w-[70px] h-[70px] bg-zinc-900/60 rounded-2xl border border-white/5 flex items-center justify-center text-zinc-700 grayscale hover:grayscale-0 transition-all active:scale-90">
-              <Star size={24} fill="currentColor" />
+      {/* 3. MINI METRICS SLIDER */}
+      <section className="flex gap-3 overflow-x-auto no-scrollbar py-2">
+        {secondaryStats.map((s, i) => (
+          <div key={i} className="flex items-center gap-3 px-5 py-3 bg-zinc-900/20 border border-white/5 rounded-2xl min-w-fit">
+            <div className={`${s.color} opacity-80`}>{s.icon}</div>
+            <div className="flex flex-col">
+              <span className="text-xs font-black text-white">{s.value}</span>
+              <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">{s.label}</span>
             </div>
+          </div>
+        ))}
+      </section>
+
+      {/* 4. ACHIEVEMENTS SYSTEM */}
+      <section className="flex flex-col gap-4">
+        <div className="flex justify-between items-center px-4">
+          <h3 className="text-[11px] font-black text-zinc-500 uppercase tracking-[0.3em] flex items-center gap-2">
+            <Trophy size={14} className="text-yellow-500" /> Mastery Badges
+          </h3>
+          <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">View All</span>
+        </div>
+        <div className="grid grid-cols-4 gap-3 px-2">
+          {[
+            { icon: <Flame size={20} />, label: "Hot Streak", active: true },
+            { icon: <Target size={20} />, label: "Deadeye", active: true },
+            { icon: <Shield size={20} />, label: "Old Guard", active: false },
+            { icon: <Crown size={20} />, label: "King", active: false },
+          ].map((badge, i) => (
+            <motion.div 
+              key={i} 
+              whileHover={{ y: -5 }}
+              className={`aspect-square rounded-3xl border flex flex-col items-center justify-center gap-1 transition-all
+                ${badge.active 
+                  ? 'bg-zinc-800/40 border-yellow-500/20 text-yellow-500 shadow-lg shadow-yellow-500/5' 
+                  : 'bg-zinc-900/10 border-white/5 text-zinc-800 grayscale'
+                }`}
+            >
+              {badge.icon}
+              <span className="text-[7px] font-black uppercase text-center leading-none">{badge.label}</span>
+            </motion.div>
           ))}
         </div>
       </section>
 
-      {/* 4. NAVIGATION ACTIONS */}
-      <section className="flex flex-col gap-2">
-        <h3 className="text-[11px] font-black text-zinc-600 uppercase tracking-[0.3em] ml-4 mb-1">Application</h3>
-        
-        <MenuAction 
-          icon={<Heart size={22} />} 
-          title="Favorite Library" 
-          sub="View your saved rizz"
-          badge={userData?.favs?.length || 0}
-          onClick={() => setTab('favorites')} 
-        />
-        
-        <MenuAction 
-          icon={<TrendingUp size={22} />} 
-          title="Rizz Analytics" 
-          sub="Performance tracking"
-          onClick={() => {}} 
-        />
+      {/* 5. DYNAMIC MENU GROUPS */}
+      {menuGroups.map((group, gIndex) => (
+        <section key={gIndex} className="flex flex-col gap-3">
+          <h3 className="text-[11px] font-black text-zinc-600 uppercase tracking-[0.4em] ml-6 mt-2">
+            {group.groupTitle}
+          </h3>
+          <div className="bg-zinc-900/30 rounded-[40px] border border-white/5 overflow-hidden backdrop-blur-md">
+            {group.items.map((item, i, arr) => (
+              <button 
+                key={item.id}
+                onClick={() => setTab(item.id)}
+                className={`w-full flex items-center justify-between p-6 active:bg-white/5 transition-all group
+                  ${i !== arr.length - 1 ? 'border-b border-white/5' : ''}`}
+              >
+                <div className="flex items-center gap-5">
+                  <div className={`${item.color} p-3.5 bg-white/5 rounded-2xl group-active:scale-90 transition-transform`}>
+                    {item.icon}
+                  </div>
+                  <div className="flex flex-col items-start text-left">
+                    <span className="text-[14px] font-black uppercase tracking-tight text-zinc-100">{item.title}</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">{item.sub}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {item.badge && (
+                    <span className="px-2.5 py-0.5 bg-blue-600 text-white text-[9px] font-black rounded-full shadow-lg shadow-blue-600/20">
+                      {item.badge}
+                    </span>
+                  )}
+                  {item.label && (
+                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 text-[8px] font-black rounded-md border border-emerald-500/20 uppercase">
+                      {item.label}
+                    </span>
+                  )}
+                  <ChevronRight size={18} className="text-zinc-800 group-hover:text-zinc-500 transition-colors" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
 
-        <MenuAction 
-          icon={<SettingsIcon size={22} />} 
-          title="Global Settings" 
-          sub="App configuration"
-          onClick={() => setTab('settings')} 
-        />
-      </section>
+      {/* 6. SYSTEM INFO & LOGOUT */}
+      <section className="mt-4 px-2 space-y-6">
+        <div className="flex items-center justify-center gap-6 opacity-20">
+          <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-white" />
+          <Fingerprint size={20} className="text-white" />
+          <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-white" />
+        </div>
 
-      {/* 5. LOGOUT SECTION */}
-      <section className="px-2">
-        <button 
+        <motion.button 
           onClick={onLogout}
-          className="w-full flex items-center justify-between p-5 rounded-[30px] bg-red-600/10 border border-red-600/20 active:bg-red-600/20 transition-all group"
+          whileTap={{ scale: 0.98 }}
+          className="w-full flex items-center justify-between p-6 rounded-[35px] bg-red-600/5 border border-red-600/10 active:bg-red-600/20 transition-all group overflow-hidden relative"
         >
-          <div className="flex items-center gap-4">
-            <div className="bg-red-600/20 p-2 rounded-xl text-red-500 group-active:scale-110 transition-transform">
-              <LogOut size={22} />
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform">
+            <ZapOff size={60} className="text-red-500" />
+          </div>
+          <div className="flex items-center gap-5 relative z-10">
+            <div className="bg-red-600/10 p-3 rounded-2xl text-red-500">
+              <LogOut size={24} />
             </div>
-            <div className="flex flex-col items-start">
-              <span className="text-sm font-black uppercase tracking-widest text-red-500">Sign Out</span>
-              <span className="text-[8px] font-bold uppercase tracking-tighter text-red-900">End current session</span>
+            <div className="flex flex-col items-start text-left">
+              <span className="text-base font-black uppercase tracking-[0.1em] text-red-500 leading-none mb-1">Terminate Session</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-red-900/60">Local cache will be cleared</span>
             </div>
           </div>
-          <ChevronRight size={18} className="text-red-900" />
-        </button>
+          <ChevronRight size={20} className="text-red-900/40" />
+        </motion.button>
+
+        <div className="flex flex-col items-center gap-3 pb-10">
+          <div className="flex gap-4 opacity-30 text-white">
+            <Smartphone size={14} />
+            <Activity size={14} />
+            <Shield size={14} />
+          </div>
+          <p className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.6em] text-center">
+            RizzUp Kernel v6.5.0 <span className="text-zinc-800">//</span> Stable Build
+          </p>
+        </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="flex flex-col items-center gap-2 mt-4 opacity-40">
-        <div className="flex gap-4">
-          <Clock size={12} />
-          <p className="text-[8px] font-black uppercase tracking-[0.4em]">Engine v6.5.0-STABLE</p>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-// --- REUSABLE MENU COMPONENT ---
-
-function MenuAction({ icon, title, sub, badge, onClick }) {
-  return (
-    <button 
-      onClick={onClick}
-      className="flex items-center justify-between p-5 rounded-[30px] bg-zinc-900/30 border border-white/5 active:bg-zinc-900/60 transition-all group"
-    >
-      <div className="flex items-center gap-4">
-        <div className="text-blue-500 group-active:scale-110 transition-transform duration-300">
-          {icon}
-        </div>
-        <div className="flex flex-col items-start text-left">
-          <span className="text-[13px] font-black uppercase tracking-tight text-zinc-100">{title}</span>
-          <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">{sub}</span>
-        </div>
-      </div>
-      <div className="flex items-center gap-3">
-        {badge !== undefined && (
-          <span className="px-2 py-0.5 bg-blue-600/10 text-blue-500 text-[9px] font-black rounded-lg border border-blue-500/20">
-            {badge}
-          </span>
-        )}
-        <ChevronRight size={18} className="text-zinc-800" />
-      </div>
-    </button>
+    </motion.div>
   );
 }
