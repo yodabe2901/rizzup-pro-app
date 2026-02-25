@@ -30,18 +30,16 @@ export default function Profile({ userData = {} }) {
   const [activeTab, setActiveTab] = useState("Showcase");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
-  // Simulation de données si userData est vide
-  const user = {
-    username: userData.username || "RizzMaster_99",
-    xp: userData.xp || 4250,
-    bio: userData.bio || "Crafting the perfect lines. Sigma mindset. ⚡",
-    verified: userData.verified || true,
-    stats: {
-      posts: 24,
-      followers: "1.2k",
-      successRate: "94%"
-    }
-  };
+  // On utilise le destructuring avec des valeurs par défaut au cas où userData est null
+const { 
+  username = "RizzMaster_99", 
+  xp = 4250, 
+  bio = "Crafting the perfect lines. Sigma mindset. ⚡", 
+  verified = true,
+  stats = { posts: 24, followers: "1.2k", successRate: "94%" }
+} = userData || {}; // Le "|| {}" évite l'erreur "cannot read property of null"
+
+const user = { username, xp, bio, verified, stats };
 
   const tabs = ["Showcase", "Badges", "Analytics"];
 
