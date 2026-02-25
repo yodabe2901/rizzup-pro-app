@@ -1,6 +1,7 @@
-import { analyzeCommentSentiment } from '../services/rizzAnalyzer';
+import { analyzeCommentSentiment, analyzeAndRecord } from '../services/rizzAnalyzer';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUser } from '../contexts/UserContext';
 import { 
   Plus, Send, X, Flame, ShieldCheck, TrendingUp, 
   MessageSquare, Share2, Award, Zap, Sparkles, 
@@ -44,12 +45,17 @@ export default function Discover() {
   ]);
 
   // --- ÉTATS D'INTERFACE ---
+  const { addXP } = useUser();
+
   const [isPosting, setIsPosting] = useState(false);
   const [newRizz, setNewRizz] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [activeFilter, setActiveFilter] = useState("Global");
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
+
+  const [xpGain, setXpGain] = useState(0);
+  const [showXpGain, setShowXpGain] = useState(false);
 
   const filters = ["Global", "Trending", "Verified", "Recent"];
 
@@ -74,12 +80,25 @@ export default function Discover() {
       triggerToast("Line is too short for the database.");
       return;
     }
-    
+
     setIsValidating(true);
     try {
+      // simulate Grok analysis for XP and record to sheet
+      const analysis = await analyzeAndRecord(newRizz);
       const isValid = await validateRizz(newRizz);
-      
-      if (isValid) {
+
+      if (isValid.valid) {
+        const xpReward = Math.max(0, analysis.xpReward || 0);
+        if (analysis.sentiment === 'POSITIVE' && xpReward > 0) {
+          addXP(xpReward);
+          setXpGain(xpReward);
+          setShowXpGain(true);
+          setTimeout(() => setShowXpGain(false), 2000);
+          triggerToast(`W Rizz! +${xpReward} XP`);
+        } else {
+          triggerToast("Rizz deployed successfully! 🚀");
+        }
+
         const newPost = {
           id: Date.now(),
           text: newRizz,
@@ -94,7 +113,6 @@ export default function Discover() {
         setPosts([newPost, ...posts]);
         setNewRizz("");
         setIsPosting(false);
-        triggerToast("Rizz deployed successfully! 🚀");
       } else {
         triggerToast("AI Rejected: Weak Rizz energy detected. ⚠️");
       }
@@ -112,6 +130,20 @@ export default function Discover() {
 
   return (
     <div className="p-6 bg-black min-h-screen pb-40 text-white font-sans overflow-x-hidden">
+      {/* xp gain popup */}
+      <AnimatePresence>
+        {showXpGain && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-24 left-1/2 -translate-x-1/2 bg-green-500/80 backdrop-blur-sm px-4 py-2 rounded-full flex items-center gap-2 z-[100]"
+          >
+            <Plus size={16} />
+            <span className="font-bold text-white">+{xpGain} XP</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* --- BACKGROUND DECORATION --- */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none opacity-20">

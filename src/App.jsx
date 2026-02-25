@@ -45,6 +45,9 @@ import Favorites from './pages/Favorites';
 import Settings from './components/Settings';
 import Onboarding from './components/Onboarding';
 
+// user context helper
+import { UserProvider } from './contexts/UserContext';
+
 // --- SYSTEM CONSTANTS ---
 const MAIN_TABS = ['home', 'search', 'chat', 'profile'];
 const SWIPE_POWER = 0.2;
@@ -170,15 +173,29 @@ export default function App() {
     } catch (err) { console.error("Sync Error", err); }
   };
 
+  // addXP helper updates state and syncs with Firestore
+  const addXP = async (amount) => {
+    if (!user || !userData) return;
+    const current = userData.xp || 0;
+    const updated = current + amount;
+    setUserData(prev => ({ ...prev, xp: updated }));
+    try {
+      const ref = doc(db, "users", user.uid);
+      await updateDoc(ref, { xp: updated });
+    } catch (err) {
+      console.error("XP update failed", err);
+    }
+  };
+
   // --- LOADING / AUTH ROUTING ---
   if (isAuthLoading) return <SplashScreen log="BOOT_UP" />;
   if (!user) return <Auth />;
   if (!isDataReady) return <SplashScreen log={bootLog} />;
 
   return (
-    <div className="bg-black min-h-screen text-white font-sans overflow-hidden select-none antialiased">
-      
-      {/* GLOBAL TOAST NOTIFICATION */}
+    <UserProvider value={{ user, userData, setUserData, addXP }}>
+      <div className="bg-black min-h-screen text-white font-sans overflow-hidden select-none antialiased">
+        {/* GLOBAL TOAST NOTIFICATION */}
       <AnimatePresence>
         {toast.show && (
           <motion.div 
@@ -265,6 +282,7 @@ export default function App() {
         />
       )}
     </div>
+    </UserProvider>
   );
 }
 

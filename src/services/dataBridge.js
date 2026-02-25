@@ -21,8 +21,36 @@ export const getSheetsData = async () => {
     return Array.isArray(lines) ? lines : [];
 
   } catch (error) {
-    // AU LIEU DE REVOYER CONSOLE.ERROR, ON RENVOIE UN TABLEAU VIDE
-    console.error("Erreur critique dataService:", error);
-    return []; 
+    console.error("Erreur critique dataBridge/getSheetsData:", error);
+    return [];
+  }
+};
+
+// write helper – in a real app this would call a Google Sheets API or
+// webhook. we simulate with fetch and guard against connection loss.
+export const saveAnalysis = async (row) => {
+  try {
+    // pretend there is an endpoint that accepts JSON rows
+    const endpoint = import.meta.env.VITE_SHEETS_WRITE_URL;
+    if (!endpoint) {
+      console.warn('No write endpoint configured, discarding', row);
+      return false;
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(row)
+    });
+
+    if (!res.ok) {
+      throw new Error(`Sheets write failed: ${res.status}`);
+    }
+
+    return true;
+  } catch (err) {
+    // fail silently but log the problem; app should not crash.
+    console.error('dataBridge.saveAnalysis error:', err);
+    return false;
   }
 };

@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, Star, Zap, Crown, ChevronRight } from 'lucide-react';
+import { useUser } from '../contexts/UserContext';
 
 export default function Account() {
   // États pour la gestion du profil et des posts (déplacés ici pour être valides)
   const [posts, setPosts] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [newLine, setNewLine] = useState('');
+
+  const { userData } = useUser();
 
   // Fonction pour poster une nouvelle ligne
   const handlePost = () => {
@@ -53,7 +56,9 @@ export default function Account() {
       <div className="bg-zinc-900/50 border border-white/5 rounded-3xl p-6 mb-8">
         <div className="flex justify-between items-end mb-4">
           <span className="text-xs font-black uppercase tracking-widest text-zinc-400">Rizz Experience</span>
-          <span className="text-xs font-black text-blue-500">2,450 / 3,000 XP</span>
+          <span className="text-xs font-black text-blue-500">
+            {userData ? `${userData.xp || 0} / 3,000 XP` : '0 / 3,000 XP'}
+          </span>
         </div>
         <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
           <motion.div 

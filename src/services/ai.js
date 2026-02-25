@@ -1,7 +1,17 @@
+import { getSystemPrompt } from '/src/services/aiConfig';
+
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 const API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-export const generateRizzResponse = async (prompt, historyOrImage = [], library = []) => {
+// generateRizzResponse accepts an optional mode argument ("SAVAGE" | "SOFT" | "MYSTERY")
+// which controls the tone via the aiConfig helper. It returns whatever the Grok API spits
+// back after stripping polite preamble. Errors are caught and collapsed into a string.
+export const generateRizzResponse = async (
+  prompt,
+  historyOrImage = [],
+  library = [],
+  mode = 'SAVAGE'
+) => {
   try {
     let history = [];
     let image = null;
@@ -12,7 +22,7 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
       history = historyOrImage;
     }
 
-    const safeHistory = Array.isArray(history) 
+    const safeHistory = Array.isArray(history)
       ? history.slice(-4).map(msg => ({
           role: msg.role === 'ai' || msg.role === 'assistant' ? 'assistant' : 'user',
           content: String(msg.text || msg.content || "").substring(0, 500)
@@ -20,10 +30,12 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
       : [];
 
     const shuffled = Array.isArray(library) ? [...library].sort(() => 0.5 - Math.random()) : [];
-    const safeLibrary = shuffled.slice(0, 5); 
-    const contextData = safeLibrary.length > 0 
+    const safeLibrary = shuffled.slice(0, 5);
+    const contextData = safeLibrary.length > 0
       ? "\n\n📚 INSPIRATION (Utilise ces styles) :\n" + safeLibrary.join(" | ")
       : "";
+
+    const sysPrompt = getSystemPrompt(mode);
 
     const response = await fetch(API_URL, {
       method: "POST",
@@ -36,18 +48,8 @@ export const generateRizzResponse = async (prompt, historyOrImage = [], library 
         messages: [
           {
             role: "system",
-            content: `Tu es 'RizzMaster', mentor de 2026. Tu n'es pas un assistant, tu es une légende de la répartie. 
-
-🚨 RÈGLES DE SURVIE :
-- INTERDICTION de faire de la psychologie de comptoir ou d'être trop gentil.
-- STYLE : Direct, audacieux, un peu provocateur.
-- SI L'USER SE PLAINT : Recadre-le direct avec humour.
-- FORMAT : Une punchline **en gras** d'abord, une explication tactique ensuite.
-
-Exemple : "**Le charisme bat la génétique 10-0.** Si t'as pas la gueule, travaille le style et l'audace."
-
-${contextData}`
-          }, // <--- La virgule et l'accolade manquaient ici !
+            content: sysPrompt + "\n" + contextData
+          },
           ...safeHistory,
           { role: "user", content: String(prompt) }
         ],
@@ -57,12 +59,13 @@ ${contextData}`
     });
 
     if (!response.ok) {
-        return "⚠️ Cerveau en surchauffe, attends 5s.";
+      return "⚠️ Cerveau en surchauffe, attends 5s.";
     }
 
     const data = await response.json();
     let text = data.choices[0]?.message?.content || "J'ai eu un blanc...";
 
+    // strip leading greetings, keep only the punchline/explanation
     return text.replace(/^(Salut|Bonjour|En tant qu'IA|Mon pote|Je vois).*?[!.:]/g, '').trim();
 
   } catch (error) {
@@ -70,9 +73,10 @@ ${contextData}`
     return "Petit bug technique, mon rizz est en maintenance.";
   }
 };
-// Ajoute ceci dans src/services/ai.js
+
+// validateRizz remains a simple exported helper; we declare it at the bottom so earlier imports
+// won't accidentally depend on it being hoisted.
 export const validateRizz = async (text) => {
-  // Simule une vérification de qualité du Rizz
   if (text.length < 5) return { valid: false, score: 0 };
   return { valid: true, score: Math.floor(Math.random() * 100) };
 };
